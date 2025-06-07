@@ -1,0 +1,41 @@
+name: wisetrack_app
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.6.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  pinput: ^4.0.0  
+  google_maps_flutter: ^2.12.2
+  dropdown_button2: ^2.3.9 # O la versión más reciente
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    # Ejemplos adicionales (puedes agregar más rutas según necesites):
+    # - assets/icons/
+    # - assets/fonts/
+    # - assets/animations/
+    # - assets/sounds/
+
+  # Si necesitas fuentes personalizadas, puedes descomentar y configurar esto:
+  # fonts:
+  #   - family: YourFontFamily
+  #     fonts:
+  #       - asset: assets/fonts/YourFont-Regular.ttf
+  #       - asset: assets/fonts/YourFont-Bold.ttf
+  #         weight: 700

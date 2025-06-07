@@ -5,6 +5,8 @@ import 'package:wisetrack_app/ui/MenuPage/AppDrawer.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'dart:async';
 
+import 'package:wisetrack_app/ui/profile/EditProfileScreen.dart';
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
 
@@ -168,11 +170,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(width: 10),
             // TODO: Reemplazar con la imagen del usuario real.
-            const CircleAvatar(
-              backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=1'),
-            ),
+            _buildDriverInfo()
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDriverInfo() {
+    return Container(
+      constraints: BoxConstraints(maxWidth: 200), // Limita el ancho máximo
+      child: Row(
+        mainAxisSize: MainAxisSize.min, // Evita que se expanda infinitamente
+        children: [
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditProfileScreen(),
+                ),
+              );
+            },
+            child: const CircleAvatar(
+              radius: 20,
+              backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=5'),
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
     );
   }

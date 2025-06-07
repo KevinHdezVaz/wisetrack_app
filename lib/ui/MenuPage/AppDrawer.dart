@@ -58,7 +58,8 @@ class AppDrawer extends StatelessWidget {
                     context: context,
                     icon: Icons.notifications,
                     title: 'Notificaciones',
-                    // routeName: '/notifications', // Descomentar cuando tengas la pantalla
+                    routeName:
+                        '/notifications', // Descomentar cuando tengas la pantalla
                     trailing: _buildNotificationBadge('3'),
                   ),
                   _buildDrawerItem(

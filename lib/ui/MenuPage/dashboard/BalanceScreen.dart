@@ -10,42 +10,7 @@ class BalanceScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        scrolledUnderElevation: 0,
-        backgroundColor: Colors.grey[50],
-        leading: _buildBackButton(context),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Balance de Hoy',
-              style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20),
-            ),
-            Text(
-              'Lun 12 may.',
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.grey),
-            onPressed: () {
-              // TODO: Lógica para refrescar datos
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_horiz, color: Colors.black),
-            onPressed: () {
-              // TODO: Lógica para más opciones
-            },
-          ),
-        ],
-      ),
+      backgroundColor: Colors.white,
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:wisetrack_app/data/models/VehicleType.dart';
+import 'package:wisetrack_app/ui/MenuPage/auditoria/AuditDetailsScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/FilterBottomSheet.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/VehicleDetailScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
@@ -184,7 +185,7 @@ class Auditoriascreen extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => VehicleDetailScreen(),
+            builder: (context) => Auditdetailsscreen(),
           ),
         );
       },

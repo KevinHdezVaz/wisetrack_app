@@ -5,40 +5,65 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.6.1
+  # Se actualizó a una versión más estable y común de Dart SDK
+  sdk: '>=3.2.0 <4.0.0' 
 
 dependencies:
   flutter:
     sdk: flutter
+  
+  # Iconos de estilo iOS
   cupertino_icons: ^1.0.8
-  pinput: ^4.0.0  
-  google_maps_flutter: ^2.12.2
-  dropdown_button2: ^2.3.9 # O la versión más reciente
-  intl: ^0.20.2
-  table_calendar: ^3.2.0
-  fl_chart: ^0.68.0 # O la versión más reciente
 
+  # Widgets y Utilidades
+  pinput: ^4.0.0
+  google_maps_flutter: ^2.12.2
+  dropdown_button2: ^2.3.9
+  intl: ^0.19.0 # Se actualizó a la versión más reciente
+  table_calendar: ^3.1.1 # Se actualizó a la versión más reciente
+  fl_chart: ^0.68.0
+  geolocator: ^12.0.0
+  permission_handler: ^11.3.1
+  shared_preferences: ^2.2.3 # Se actualizó a la versión más reciente
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^4.0.0 # Se actualizó a la versión más reciente
+  
+  # --- INICIO DE LA CORRECCIÓN ---
+  # El paquete del splash screen va en dev_dependencies
+  flutter_native_splash: ^2.4.0 # Se actualizó a la versión más reciente
+  # --- FIN DE LA CORRECCIÓN ---
+
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/
-    # Ejemplos adicionales (puedes agregar más rutas según necesites):
-    # - assets/icons/
-    # - assets/fonts/
-    # - assets/animations/
-    # - assets/sounds/
+    # Es buena práctica ser explícito con las imágenes para evitar errores
+    # - assets/images/logo_w.png
+    # - assets/images/splash_background.png
+    # - assets.images/backbtn.png
+    
+# --- INICIO DE LA CORRECCIÓN ---
+# Añade esta sección completa al final de tu archivo.
+# Asegúrate de que no esté dentro de la sección 'flutter:'.
+flutter_native_splash:
+  # El color de fondo es un respaldo, pero la imagen lo cubrirá todo.
+  color: "#008C95"
+  
+  # Usamos 'background_image' para la imagen de pantalla completa.
+  background_image: assets/images/inicio.png
 
-  # Si necesitas fuentes personalizadas, puedes descomentar y configurar esto:
-  # fonts:
-  #   - family: YourFontFamily
-  #     fonts:
-  #       - asset: assets/fonts/YourFont-Regular.ttf
-  #       - asset: assets/fonts/YourFont-Bold.ttf
-  #         weight: 700
+  # Para Android 12 y superior, el sistema fuerza un ícono central.
+  # No soporta imágenes de fondo, así que aquí mantenemos el logo central.
+  android_12:
+    color: "#008C95"
+    image: assets/images/logoApp.png # Tu logo para el centro
+
+  # Cómo se ajusta la imagen en plataformas que lo soportan.
+  android_gravity: fill
+  ios_content_mode: scaleAspectFill
+# --- FIN DE LA CORRECCIÓN ---

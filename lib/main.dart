@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
-// --- INICIO DE LA CORRECCIÓN ---
-// Se cambió 'date_symbol_data_file.dart' por 'date_symbol_data_local.dart'
 import 'package:intl/date_symbol_data_local.dart';
-// --- FIN DE LA CORRECCIÓN ---
 
-// Importa todas las pantallas que vas a usar en las rutas
+// --- Importaciones de tus pantallas ---
+// Es una buena práctica tener un archivo "barril" para exportar todas las pantallas
+// pero por ahora las importamos una por una.
 import 'package:wisetrack_app/ui/IntroPage/OnboardingWrapper.dart';
 import 'package:wisetrack_app/ui/MenuPage/DashboardScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/auditoria/AuditoriaScreen.dart';
-import 'package:wisetrack_app/ui/MenuPage/dashboard/BalanceScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/dashboard/CombinedDashboardScreen.dart';
-import 'package:wisetrack_app/ui/MenuPage/dashboard/DataVisualizationScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/MobilesScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/notifications/NotificationsScreen.dart';
+import 'package:wisetrack_app/ui/SplashScreen.dart';
+import 'package:wisetrack_app/ui/login/LoginScreen.dart';
 import 'package:wisetrack_app/ui/profile/SettingsScreen.dart';
 
+// --- Importa la pantalla que maneja la lógica del Splash Screen ---
+
 void main() {
-  // Se inicializa la localización para español antes de correr la app.
+  // Se inicializa la localización para español ANTES de correr la app.
+  // Esto soluciona los errores de formato de fecha en toda la aplicación.
   initializeDateFormatting('es_ES', null).then((_) {
     runApp(const MyApp());
   });
@@ -28,41 +30,39 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'WiseTrack App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        // Define un color de fondo base para los Scaffolds si quieres
+        scaffoldBackgroundColor: Colors.grey[100],
       ),
 
-      // La ruta inicial que se muestra al arrancar.
-      initialRoute: '/',
+      // --- ESTRUCTURA DE NAVEGACIÓN CORREGIDA ---
 
-      // Mapa de todas las rutas (pantallas) de la aplicación.
+      // Usamos 'home' para establecer el punto de entrada de la app.
+      // LandingScreen se encargará de mostrar el splash y luego navegar a la ruta '/onboarding'.
+      home: const SplashScreen(),
+
+      // 'routes' define todas las pantallas a las que se puede navegar por nombre.
       routes: {
-        // La ruta base '/' mostrará el OnboardingWrapper.
-        '/': (context) => const OnboardingWrapper(),
+        // Pantallas del flujo inicial
+        '/onboarding': (context) => const OnboardingWrapper(),
+        '/login': (context) => const LoginScreen(), // Podrías añadirla aquí
 
-        // Ruta para la pantalla principal del Dashboard.
+        // Pantallas principales después del login/onboarding
         '/dashboard': (context) => const DashboardScreen(),
-
+        '/dashboard_combined': (context) => const CombinedDashboardScreen(),
+        '/mobiles': (context) => MobilesScreen(),
+        '/auditoria': (context) =>
+            Auditoriascreen(), // Asegúrate que el nombre de la clase sea correcto
         '/notifications': (context) => const NotificationsScreen(),
-        // Ruta para la pantalla de Configuraciones.
         '/settings': (context) => const SettingsScreen(),
 
-        // Ruta para la pantalla de Balance (Dashboard 2).
-        '/dashboard2': (context) => const CombinedDashboardScreen(),
-
-        // Ruta para la pantalla de Auditorías.
-        '/auditoria': (context) =>
-            Auditoriascreen(), // Asegúrate que el nombre de la clase es correcto
-
-        // Ruta para la pantalla de Móviles.
-        '/mobiles': (context) => MobilesScreen(),
-
-        // TODO: Añade aquí las rutas para el resto de tus pantallas.
-        // '/notifications': (context) => const NotificationsScreen(),
-        // '/login': (context) => const LoginScreen(),
+        // Puedes añadir rutas a pantallas de detalle aquí también
+        // '/vehicle_detail': (context) => const VehicleDetailScreen(),
+        // '/notification_detail': (context) => const NotificationDetailScreen(),
       },
     );
   }

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
-
 import 'package:wisetrack_app/ui/color/app_colors.dart';
-import 'package:wisetrack_app/ui/login/LoginScreen.dart'; // Importado para la rotación
+import 'package:wisetrack_app/utils/Preferences.dart';
 
 class OnboardingscreenThree extends StatelessWidget {
   final PageController pageController;
@@ -39,7 +37,6 @@ class OnboardingscreenThree extends StatelessWidget {
           top: 0,
           right: 0,
           child: Image.asset(
-            // Asegúrate de que esta ruta sea correcta
             'assets/images/rectangle1.png',
             width: MediaQuery.of(context).size.width * 0.5,
             fit: BoxFit.contain,
@@ -56,13 +53,11 @@ class OnboardingscreenThree extends StatelessWidget {
         child: Column(
           children: [
             const Spacer(flex: 2),
-            // Ilustración principal
             Image.asset(
               'assets/images/introPage3.png',
               height: MediaQuery.of(context).size.height * 0.4,
             ),
             const Spacer(flex: 1),
-            // Textos
             const Text(
               'Notificaciones',
               style: TextStyle(
@@ -82,7 +77,6 @@ class OnboardingscreenThree extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const Spacer(flex: 3),
-            // Navegación inferior
             _buildNavigation(context),
             const SizedBox(height: 40),
           ],
@@ -91,13 +85,11 @@ class OnboardingscreenThree extends StatelessWidget {
     );
   }
 
-  /// Widget que construye la navegación inferior (indicadores y botón).
   Widget _buildNavigation(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Indicador de página
         Row(
           children: [
             _buildIndicator(isActive: false, width: 20.0),
@@ -107,15 +99,16 @@ class OnboardingscreenThree extends StatelessWidget {
             _buildIndicator(isActive: true, width: 80.0),
           ],
         ),
-        // Botón de continuar
         ElevatedButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => LoginScreen(),
-              ),
-            );
+          onPressed: () async {
+            // Mark onboarding as seen
+            try {
+              await Preferences.setOnboardingSeen();
+            } catch (e) {
+              print('Error setting onboarding status: $e');
+            }
+            // Navigate to LoginScreen using named route
+            Navigator.pushReplacementNamed(context, '/login');
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,

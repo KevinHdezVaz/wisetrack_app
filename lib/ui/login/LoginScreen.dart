@@ -72,28 +72,30 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Widget que construye el encabezado de la pantalla.
   Widget _buildHeader() {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '¡Hola de nuevo!',
-          style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF333333),
+    return const Center(
+      // ← Widget adicional
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            '¡Hola de nuevo!',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333),
+            ),
           ),
-        ),
-        SizedBox(height: 8),
-        Text(
-          'Nos alegra tenerte aquí.',
-          style: TextStyle(
-            fontSize: 18,
-            color: Colors.black,
+          SizedBox(height: 8),
+          Text(
+            'Nos alegra tenerte aquí.',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.black,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -115,21 +117,18 @@ class _LoginScreenState extends State<LoginScreen> {
         _buildTextField(label: 'Empresa', hint: 'Nombre de tu empresa'),
         const SizedBox(height: 100),
 
-        // Botón de Iniciar Sesión
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: () {
-              // TODO: Lógica de inicio de sesión
-            },
+            onPressed: () {},
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  const Color(0xFFB2DFDB), // Color grisáceo/desactivado
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: const Color(0xFFB2DFDB),
+              padding: const EdgeInsets.symmetric(
+                  vertical: 10), // ← Cambiado de 16 a 10
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12.0),
               ),
-              elevation: 0, // Sin sombra para el estado desactivado
+              elevation: 0,
             ),
             child: const Text(
               'Iniciar sesión',
@@ -140,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-        ),
+        )
       ],
     );
   }

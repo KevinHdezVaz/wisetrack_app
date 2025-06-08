@@ -184,7 +184,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor:
               _isButtonEnabled ? AppColors.primary : AppColors.disabled,
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.0),
           ),

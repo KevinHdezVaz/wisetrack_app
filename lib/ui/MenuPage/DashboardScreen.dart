@@ -233,7 +233,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   decoration: InputDecoration(
                     hintText: 'Buscar un móvil',
                     border: InputBorder.none,
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    prefixIcon: const Icon(Icons.search, color: Colors.black),
 
                     // --- INICIO DE LA MODIFICACIÓN ---
                     suffixIcon: GestureDetector(
@@ -246,16 +246,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           },
                         );
                       },
-                      // 1. Envolvemos el ícono en un Container para tener control del alineamiento y el padding.
                       child: Container(
-                        // El padding asegura que el área para tocar no sea demasiado pequeña.
                         padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                        child: ImageIcon(
-                          const AssetImage('assets/images/icon_filter.png'),
-                          color: AppColors.primary,
-                          // 2. Aquí defines el tamaño exacto del ícono.
-                          //    Puedes jugar con este valor (ej. 18, 20, 22).
-                          size: 5,
+                        child: Transform.scale(
+                          scale:
+                              0.7, // Escala el ícono al 70% de su tamaño original
+                          child: ImageIcon(
+                            const AssetImage('assets/images/icon_filter.png'),
+                            color: AppColors.primary,
+                            size: 10, // Usa el tamaño original
+                          ),
                         ),
                       ),
                     ),

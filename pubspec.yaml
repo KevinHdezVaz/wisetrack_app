@@ -25,6 +25,8 @@ dependencies:
   geolocator: ^12.0.0
   permission_handler: ^11.3.1
   shared_preferences: ^2.2.3 # Se actualizó a la versión más reciente
+  http: ^0.13.5
+
 
 dev_dependencies:
   flutter_test:

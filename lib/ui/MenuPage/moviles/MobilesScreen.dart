@@ -135,19 +135,28 @@ class MobilesScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(30),
             borderSide: BorderSide.none,
           ),
-          prefixIcon: const Icon(Icons.search, color: Colors.grey),
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.filter_list, color: AppColors.primary),
-            onPressed: () {
+          prefixIcon: const Icon(Icons.search, color: Colors.black),
+          suffixIcon: GestureDetector(
+            onTap: () {
               showModalBottomSheet(
                 context: context,
-                isScrollControlled:
-                    true, // Permite que el modal ocupe más espacio si es necesario
+                isScrollControlled: true,
                 builder: (BuildContext context) {
                   return const FilterBottomSheet();
                 },
               );
             },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: Transform.scale(
+                scale: 0.7, // Escala el ícono al 70% de su tamaño original
+                child: ImageIcon(
+                  const AssetImage('assets/images/icon_filter.png'),
+                  color: AppColors.primary,
+                  size: 10, // Usa el tamaño original
+                ),
+              ),
+            ),
           ),
         ),
       ),

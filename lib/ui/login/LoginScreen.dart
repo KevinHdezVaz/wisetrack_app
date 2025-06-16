@@ -1,6 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:wisetrack_app/data/models/LOGIN/login_request_model.dart';
+import 'package:wisetrack_app/data/services/auth_api_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/DashboardScreen.dart';
+import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/login/ForgotPasswordScreen.dart';
+import 'package:wisetrack_app/utils/constants.dart'; // Asegúrate de importar esto
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -11,6 +17,28 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isPasswordVisible = false;
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _companyController = TextEditingController();
+  bool _isButtonEnabled = false; // Estado para habilitar/deshabilitar el botón
+  bool _isLoading = false; // Estado para el indicador de progreso
+
+  @override
+  void initState() {
+    super.initState();
+    // Escuchar cambios en los controladores para actualizar el estado del botón
+    _usernameController.addListener(_updateButtonState);
+    _passwordController.addListener(_updateButtonState);
+    _companyController.addListener(_updateButtonState);
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _companyController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,10 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Capa 1: Elementos decorativos de fondo
           _buildBackground(context),
-
-          // Capa 2: Contenido principal con scroll
           SafeArea(
             child: SingleChildScrollView(
               child: Padding(
@@ -41,12 +66,15 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(),
+            ), // Indicador de progreso
         ],
       ),
     );
   }
 
-  /// Widget que construye los elementos decorativos del fondo.
   Widget _buildBackground(BuildContext context) {
     return Stack(
       children: [
@@ -54,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
           top: 0,
           right: -90,
           child: Image.asset(
-            'assets/images/rectangle1.png', // Asegúrate de tener esta imagen
+            'assets/images/rectangle1.png',
             width: MediaQuery.of(context).size.width * 0.5,
             fit: BoxFit.contain,
           ),
@@ -63,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
           bottom: 0,
           left: 0,
           child: Image.asset(
-            'assets/images/rectangle3.png', // Asegúrate de tener esta imagen
+            'assets/images/rectangle3.png',
             width: MediaQuery.of(context).size.width * 0.5,
             fit: BoxFit.contain,
           ),
@@ -74,7 +102,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildHeader() {
     return const Center(
-      // ← Widget adicional
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -99,32 +126,32 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Widget que construye el formulario de inicio de sesión.
   Widget _buildForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Campo de Correo Electrónico
         _buildTextField(
-            label: 'Correo electrónico', hint: 'tucorreo@ejemplo.com'),
+          label: 'Correo electrónico',
+          hint: 'tucorreo@ejemplo.com',
+          controller: _usernameController,
+        ),
         const SizedBox(height: 20),
-
-        // Campo de Contraseña
-        _buildPasswordField(),
+        _buildPasswordField(controller: _passwordController),
         const SizedBox(height: 20),
-
-        // Campo de Empresa
-        _buildTextField(label: 'Empresa', hint: 'Nombre de tu empresa'),
+        _buildTextField(
+          label: 'Empresa',
+          hint: 'Nombre de tu empresa',
+          controller: _companyController,
+        ),
         const SizedBox(height: 100),
-
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: () {},
+            onPressed: _isButtonEnabled ? () => _login() : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFB2DFDB),
-              padding: const EdgeInsets.symmetric(
-                  vertical: 10), // ← Cambiado de 16 a 10
+              backgroundColor:
+                  _isButtonEnabled ? AppColors.primary : Colors.grey,
+              padding: const EdgeInsets.symmetric(vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12.0),
               ),
@@ -144,7 +171,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Widget para construir los enlaces del pie de página.
   Widget _buildFooter() {
     return Column(
       children: [
@@ -157,16 +183,12 @@ class _LoginScreenState extends State<LoginScreen> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => DashboardScreen(),
-                  ),
+                  MaterialPageRoute(builder: (context) => DashboardScreen()),
                 );
               },
               child: const Text(
                 'Créala aquí.',
-                style: TextStyle(
-                  color: Color(0xFF008C95),
-                ),
+                style: TextStyle(color: Color(0xFF008C95)),
               ),
             ),
           ],
@@ -176,24 +198,23 @@ class _LoginScreenState extends State<LoginScreen> {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (context) => ForgotPasswordScreen(),
-              ),
+              MaterialPageRoute(builder: (context) => ForgotPasswordScreen()),
             );
           },
           child: const Text(
             'Recupera tu cuenta.',
-            style: TextStyle(
-              color: Color(0xFF008C95),
-            ),
+            style: TextStyle(color: Color(0xFF008C95)),
           ),
         ),
       ],
     );
   }
 
-  /// Widget reutilizable para campos de texto genéricos.
-  Widget _buildTextField({required String label, required String hint}) {
+  Widget _buildTextField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -203,6 +224,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 8),
         TextFormField(
+          controller: controller,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
@@ -221,8 +243,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Widget específico para el campo de contraseña conmutador de visibilidad.
-  Widget _buildPasswordField() {
+  Widget _buildPasswordField({required TextEditingController controller}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -232,6 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 8),
         TextFormField(
+          controller: controller,
           obscureText: !_isPasswordVisible,
           decoration: InputDecoration(
             hintText: 'Ingresa tu clave de acceso',
@@ -260,5 +282,54 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ],
     );
+  }
+
+  void _updateButtonState() {
+    setState(() {
+      _isButtonEnabled = _usernameController.text.trim().isNotEmpty &&
+          _passwordController.text.trim().isNotEmpty &&
+          _companyController.text.trim().isNotEmpty;
+    });
+  }
+
+  Future<void> _login() async {
+    print('Botón presionado, llamando a _login');
+    if (!_isButtonEnabled) return;
+
+    setState(() {
+      _isLoading = true; // Mostrar el CircularProgressIndicator
+    });
+
+    try {
+      final loginResponse = await AuthService.login(
+        username: _usernameController.text.trim(),
+        password: _passwordController.text.trim(),
+        company: _companyController.text.trim(),
+      );
+      print('Respuesta del servicio: ${loginResponse.toString()}');
+
+      if (loginResponse.token.isNotEmpty) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardScreen()),
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Inicio de sesión exitoso')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${loginResponse.error}')),
+        );
+      }
+    } catch (e) {
+      print('Excepción en _login: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error de conexión: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false; // Ocultar el CircularProgressIndicator
+      });
+    }
   }
 }

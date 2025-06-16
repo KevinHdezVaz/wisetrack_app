@@ -44,7 +44,7 @@ class AppDrawer extends StatelessWidget {
                       context: context,
                       icon: Icons.dashboard,
                       title: 'Dashboard',
-                      routeName: '/dashboard2'),
+                      routeName: '/dashboard_combined'),
 
                   // ... resto de los items ...
                   _buildDrawerItem(

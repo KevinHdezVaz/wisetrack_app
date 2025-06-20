@@ -1,12 +1,10 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:wisetrack_app/data/models/LOGIN/login_request_model.dart';
 import 'package:wisetrack_app/data/services/auth_api_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/DashboardScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/login/ForgotPasswordScreen.dart';
-import 'package:wisetrack_app/utils/constants.dart'; // Asegúrate de importar esto
 import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart'; // Importa el widget corregido
 
 class LoginScreen extends StatefulWidget {
@@ -16,8 +14,7 @@ class LoginScreen extends StatefulWidget {
   _LoginScreenState createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
-    with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   bool _isPasswordVisible = false;
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -32,12 +29,12 @@ class _LoginScreenState extends State<LoginScreen>
     _usernameController.addListener(_updateButtonState);
     _passwordController.addListener(_updateButtonState);
     _companyController.addListener(_updateButtonState);
+    
+    // El controlador ya estaba, solo ajustamos la duración si es necesario
     _animationController = AnimationController(
         vsync: this,
-        duration: const Duration(seconds: 3)) // Duración estimada inicial
-      ..addListener(() {
-        setState(() {});
-      });
+        duration: const Duration(seconds: 4) // Duración de un ciclo de animación
+    );
   }
 
   @override
@@ -48,6 +45,103 @@ class _LoginScreenState extends State<LoginScreen>
     _animationController.dispose();
     super.dispose();
   }
+
+  void _updateButtonState() {
+    setState(() {
+      _isButtonEnabled = _usernameController.text.trim().isNotEmpty &&
+          _passwordController.text.trim().isNotEmpty &&
+          _companyController.text.trim().isNotEmpty;
+    });
+  }
+
+  // --- LÓGICA DE LOGIN REFINADA ---
+Future<void> _login() async {
+  if (!_isButtonEnabled || _isLoading) return;
+
+  setState(() {
+    _isLoading = true;
+  });
+
+  // Inicia la animación en bucle
+  _animationController.repeat();
+
+  try {
+    final loginResponse = await AuthService.login(
+      username: _usernameController.text.trim(),
+      password: _passwordController.text.trim(),
+      company: _companyController.text.trim(),
+    );
+
+    // Detiene el bucle y completa la animación suavemente
+    _animationController.forward(from: _animationController.value).whenCompleteOrCancel(() {
+      _animationController.stop();
+
+      if (!mounted) return;
+
+      if (loginResponse.token.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Inicio de sesión exitoso'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardScreen()),
+        );
+      } else {
+        // Personalizar el mensaje de error
+        String errorMessage = 'Usuario, contraseña o empresa incorrectos';
+        if (loginResponse.error != null) {
+          try {
+            // Decodifica el JSON del error
+            final errorData = jsonDecode(loginResponse.error!);
+            if (errorData is Map && errorData.containsKey('error')) {
+              final innerError = jsonDecode(errorData['error']);
+              if (innerError is Map && innerError.containsKey('non_field_errors')) {
+                final errors = innerError['non_field_errors'];
+                if (errors is List && errors.isNotEmpty) {
+                  errorMessage = errors[0]['string'] ?? errorMessage;
+                  // Corrige problemas de codificación (si el servidor no usa UTF-8)
+                  errorMessage = errorMessage.replaceAll('invÃ¡lidas', 'inválidas');
+                }
+              }
+            }
+          } catch (e) {
+            // Si el parseo falla, usa el mensaje por defecto
+            errorMessage = 'Error al iniciar sesión, Usuario o contraseña incorrectos.';
+          }
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    });
+  } catch (e) {
+    if (mounted) {
+      _animationController.stop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error de conexión: No se pudo conectar con el servidor'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  } finally {
+    // Pequeña demora para que la animación termine de forma visible
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+      _animationController.reset();
+    }
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen>
                     const SizedBox(height: 80),
                     _buildHeader(),
                     const SizedBox(height: 40),
-                    _buildForm(),
+                    _buildForm(), // El botón está dentro de _buildForm
                     const SizedBox(height: 30),
                     _buildFooter(),
                     const SizedBox(height: 40),
@@ -75,16 +169,23 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ),
+          // --- INDICADOR DE CARGA CENTRALIZADO ---
           if (_isLoading)
-            AnimatedTruckProgress(
-              progress: _animationController.value,
-            ), // Indicador de progreso con animación de camión
+            Center(
+              child: AnimatedTruckProgress(
+                // Pasamos el controlador completo
+                animation: _animationController,
+              ),
+            ),
         ],
       ),
     );
   }
 
+  // --- El resto de tus widgets (_buildBackground, etc.) están bien ---
+  // --- Puedes copiarlos y pegarlos tal cual los tenías ---
   Widget _buildBackground(BuildContext context) {
+    // Asegúrate que las imágenes existen en tu pubspec.yaml y la ruta es correcta
     return Stack(
       children: [
         Positioned(
@@ -156,11 +257,14 @@ class _LoginScreenState extends State<LoginScreen>
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _isButtonEnabled ? () => _login() : null,
+            // El onPressed ahora llama a la función _login refactorizada
+            onPressed: _isButtonEnabled && !_isLoading ? _login : null,
             style: ElevatedButton.styleFrom(
               backgroundColor:
-                  _isButtonEnabled ? AppColors.primary : Colors.grey,
+                  _isButtonEnabled && !_isLoading ? AppColors.primary : Colors.grey.shade400,
+              disabledBackgroundColor: Colors.grey.shade400,
               padding: const EdgeInsets.symmetric(vertical: 10),
+              minimumSize: const Size(0, 50),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12.0),
               ),
@@ -190,14 +294,16 @@ class _LoginScreenState extends State<LoginScreen>
                 style: TextStyle(color: Colors.black)),
             GestureDetector(
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => DashboardScreen()),
-                );
+                // Aquí deberías navegar a tu pantalla de registro
+                // Navigator.push(context, MaterialPageRoute(builder: (context) => SignUpScreen()));
+                print("Navegar a pantalla de registro");
               },
               child: const Text(
                 'Créala aquí.',
-                style: TextStyle(color: Color(0xFF008C95)),
+                style: TextStyle(
+                  color: Color(0xFF008C95),
+                  fontWeight: FontWeight.bold
+                ),
               ),
             ),
           ],
@@ -212,7 +318,10 @@ class _LoginScreenState extends State<LoginScreen>
           },
           child: const Text(
             'Recupera tu cuenta.',
-            style: TextStyle(color: Color(0xFF008C95)),
+            style: TextStyle(
+              color: Color(0xFF008C95),
+              fontWeight: FontWeight.bold
+            ),
           ),
         ),
       ],
@@ -291,62 +400,5 @@ class _LoginScreenState extends State<LoginScreen>
         ),
       ],
     );
-  }
-
-  void _updateButtonState() {
-    setState(() {
-      _isButtonEnabled = _usernameController.text.trim().isNotEmpty &&
-          _passwordController.text.trim().isNotEmpty &&
-          _companyController.text.trim().isNotEmpty;
-    });
-  }
-
-  Future<void> _login() async {
-    if (!_isButtonEnabled) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    _animationController.reset();
-    _animationController.forward();
-
-    try {
-      final loginResponse = await AuthService.login(
-        username: _usernameController.text.trim(),
-        password: _passwordController.text.trim(),
-        company: _companyController.text.trim(),
-      );
-      print('Respuesta del servicio: ${loginResponse.toString()}');
-
-      if (loginResponse.token.isNotEmpty) {
-        await _animationController.animateTo(1.0,
-            duration: const Duration(milliseconds: 500));
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => DashboardScreen()),
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Inicio de sesión exitoso')),
-        );
-      } else {
-        await _animationController.animateTo(1.0,
-            duration: const Duration(milliseconds: 500));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${loginResponse.error}')),
-        );
-      }
-    } catch (e) {
-      await _animationController.animateTo(1.0,
-          duration: const Duration(milliseconds: 500));
-      print('Excepción en _login: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error de conexión: $e')),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
 }

@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart'; 
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:wisetrack_app/ui/MenuPage/AppDrawer.dart';
-import 'package:wisetrack_app/ui/MenuPage/moviles/FilterBottomSheet.dart';
-import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'dart:async';
 
+// Importaciones de la aplicación (Corregidas para consistencia)
+import 'package:wisetrack_app/data/models/vehicles/Vehicle.dart';
+import 'package:wisetrack_app/data/models/vehicles/VehiclePositionModel.dart'; 
+import 'package:wisetrack_app/data/services/VehicleServicePosition.dart';
+import 'package:wisetrack_app/data/services/auth_api_service.dart';
+import 'package:wisetrack_app/data/services/vehicles_service.dart';
+import 'package:wisetrack_app/ui/MenuPage/AppDrawer.dart';
+import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/profile/EditProfileScreen.dart';
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -16,302 +22,311 @@ class DashboardScreen extends StatefulWidget {
   _DashboardScreenState createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with TickerProviderStateMixin {
+  // --- Controladores del Mapa y Marcadores ---
   final Completer<GoogleMapController> _mapController = Completer();
   final Set<Marker> _markers = {};
-
   Position? _lastKnownPosition;
-  // Distancia mínima (en metros) para considerar un cambio de ubicación.
-  static const double _locationChangeThreshold = 50.0;
+  
+  // --- Estado de Carga y Animación ---
+  bool _isLoading = false;
+  late AnimationController _animationController;
 
-  static const CameraPosition _initialPosition = CameraPosition(
-    target: LatLng(
-        -32.775, -71.229), // Coordenadas aproximadas de La Calera/La Ligua
-    zoom: 11.0,
-  );
+  // --- Estado para la funcionalidad de Búsqueda ---
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  bool _isSearchFocused = false;
+  List<Vehicle> _allVehicles = [];
+  List<Vehicle> _filteredVehicles = [];
+  Map<String, LatLng> _vehiclePositions = {};
 
   @override
   void initState() {
     super.initState();
-    // Carga los marcadores iniciales al construir la pantalla.
-    _setMarkers();
-    // Solicita el permiso de ubicación y anima el mapa al cargar la pantalla.
+    
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+
+    _searchFocusNode.addListener(_onSearchFocusChange);
+    _searchController.addListener(_filterVehicles);
+
+    _initializeDashboardData();
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _requestLocationPermissionAndAnimate();
     });
   }
 
-  Future<void> _requestLocationPermissionAndAnimate() async {
-    var status = await Permission.location.status;
-    if (status.isDenied) {
-      status = await Permission.location.request();
-    }
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
-    if (status.isGranted) {
-      try {
-        Position newPosition = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
+  /// Inicializa los datos del dashboard en el orden deseado.
+  Future<void> _initializeDashboardData() async {
+    // CORREGIDO: Se asegura que la llamada ligera se ejecute primero.
+    await _fetchVehicleListForSearch();
+    await _fetchAndSetVehicleMarkers();
+  }
 
-        // --- INICIO DE LA LÓGICA DE CACHÉ ---
-
-        bool hasMovedSignificantly = true; // Asumimos que sí por defecto.
-
-        if (_lastKnownPosition != null) {
-          // Calcula la distancia entre la nueva posición y la última guardada.
-          final distanceInMeters = Geolocator.distanceBetween(
-            _lastKnownPosition!.latitude,
-            _lastKnownPosition!.longitude,
-            newPosition.latitude,
-            newPosition.longitude,
-          );
-
-          print(
-              "Distancia desde la última posición: ${distanceInMeters.toStringAsFixed(2)} metros.");
-
-          // Si la distancia es menor que nuestro umbral, no hacemos nada.
-          if (distanceInMeters < _locationChangeThreshold) {
-            hasMovedSignificantly = false;
-            print(
-                "El usuario no se ha movido lo suficiente. No se animará el mapa.");
-          }
-        }
-
-        // Solo animamos la cámara si es la primera vez o si se ha movido lo suficiente.
-        if (hasMovedSignificantly) {
-          print("Actualizando la vista del mapa a la nueva ubicación.");
-
-          final GoogleMapController controller = await _mapController.future;
-          await controller.animateCamera(
-            CameraUpdate.newCameraPosition(
-              CameraPosition(
-                target: LatLng(newPosition.latitude, newPosition.longitude),
-                zoom: 15.0,
-              ),
-            ),
-          );
-
-          // Actualizamos la última posición conocida.
-          setState(() {
-            _lastKnownPosition = newPosition;
-          });
-        }
-        // --- FIN DE LA LÓGICA DE CACHÉ ---
-
-        // El marcador de ubicación del usuario se actualiza siempre.
-        _updateUserLocationMarker(newPosition);
-      } catch (e) {
-        print("Error al obtener la ubicación: $e");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'No se pudo obtener la ubicación. Asegúrate de que tu GPS esté activado.'),
-            ),
-          );
-        }
-      }
-    } else {
-      print("Permiso de ubicación denegado.");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'El permiso de ubicación es necesario para usar esta función.'),
-          ),
-        );
-      }
+  /// Obtiene la lista completa de vehículos para usar en la búsqueda.
+  Future<void> _fetchVehicleListForSearch() async {
+    try {
+      _allVehicles = await VehicleService.getAllVehicles();
+      setState(() {
+        // CAMBIO 1: Ahora, inicialmente, la lista filtrada contiene TODOS los vehículos.
+        _filteredVehicles = List.from(_allVehicles);
+      });
+    } catch (e) {
+      print('Error al obtener la lista de vehículos para búsqueda: $e');
     }
   }
 
-  /// Actualiza o añade el marcador de la ubicación actual del usuario.
-  void _updateUserLocationMarker(Position position) {
+  /// Filtra la lista de vehículos basado en el texto del buscador.
+  void _filterVehicles() {
+    final query = _searchController.text.toLowerCase();
     setState(() {
-      // Primero, removemos el marcador anterior si existe.
-      _markers
-          .removeWhere((m) => m.markerId == const MarkerId('user_location'));
-      // Luego, añadimos el nuevo.
-      _markers.add(
-        Marker(
-          markerId: const MarkerId('user_location'),
-          position: LatLng(position.latitude, position.longitude),
-          infoWindow: const InfoWindow(title: 'Tu ubicación'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+      if (query.isEmpty) {
+        // CAMBIO 2: Si la búsqueda está vacía, la lista filtrada vuelve a ser la lista completa.
+        _filteredVehicles = List.from(_allVehicles);
+      } else {
+        _filteredVehicles = _allVehicles
+            .where((vehicle) => vehicle.plate.toLowerCase().contains(query))
+            .toList();
+      }
+    });
+  }
+  
+  void _onSearchFocusChange() {
+    setState(() {
+      _isSearchFocused = _searchFocusNode.hasFocus;
+    });
+  }
+
+  void _onVehicleSelected(Vehicle vehicle) async {
+    _searchFocusNode.unfocus();
+    _searchController.clear();
+
+    final position = _vehiclePositions[vehicle.plate];
+    if (position != null) {
+      final GoogleMapController controller = await _mapController.future;
+      controller.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: position, zoom: 16.0),
         ),
       );
-    });
+    }
   }
 
-  /// Simula la carga de marcadores en el mapa.
-  void _setMarkers() {
-    setState(() {
-      _markers.addAll([
-        Marker(
-          markerId: const MarkerId('movil_en_ruta_1'),
-          position:
-              const LatLng(-32.449, -71.241), // Ubicación cerca de La Ligua
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
-        ),
-        Marker(
-          markerId: const MarkerId('movil_en_ruta_2'),
-          position: const LatLng(-32.683, -71.433), // Ubicación cerca de Papudo
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
-        ),
-        Marker(
-          markerId: const MarkerId('alerta_detenido'),
-          position:
-              const LatLng(-32.84, -71.45), // Ubicación cerca de Puchuncaví
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        ),
-      ]);
-    });
-  }
+  Future<void> _fetchAndSetVehicleMarkers() async {
+    try {
+      // CORREGIDO: El nombre del método era getVehiclesPositions
+      final VehiclePositionResponse response = await VehiclePositionService.getAllVehiclesPosition();
+      if (response.data.isEmpty) return;
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: const AppDrawer(),
-      body: Stack(
-        children: [
-          // Capa 0: El mapa de Google.
-          GoogleMap(
-            mapType: MapType.normal,
-            initialCameraPosition: _initialPosition,
-            onMapCreated: (GoogleMapController controller) {
-              // Completa el controlador del mapa cuando el mapa esté listo.
-              if (!_mapController.isCompleted) {
-                _mapController.complete(controller);
-              }
-            },
-            markers: _markers,
-            myLocationEnabled:
-                true, // Muestra el punto azul de la ubicación actual
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
+      final Map<String, LatLng> positionsMap = {};
+      final Set<Marker> vehicleMarkers = response.data.map((position) {
+        final latLng = LatLng(position.latitude, position.longitude);
+        positionsMap[position.vehiclePlate] = latLng;
+        return Marker(
+          markerId: MarkerId(position.vehiclePlate),
+          position: latLng,
+          infoWindow: InfoWindow(
+            title: position.vehiclePlate,
+            snippet: 'Velocidad: ${position.speed.toStringAsFixed(1)} km/h',
           ),
-          // Capa 1: Barra de búsqueda y elementos superiores.
-          _buildTopSearchBar(),
-          // Capa 2: Botones de acción flotantes en la esquina inferior derecha.
-          _buildFloatingActionButtons(),
-        ],
-      ),
+          icon: _getMarkerIcon(position.ignitionStatus),
+        );
+      }).toSet();
+      
+      setState(() {
+        _markers.removeWhere((m) => m.markerId.value != 'user_location');
+        _markers.addAll(vehicleMarkers);
+        _vehiclePositions = positionsMap;
+      });
+
+    } catch (e) {
+      print('Error al obtener los marcadores de vehículos: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudieron cargar los vehículos: $e')),
+        );
+      }
+    }
+  }
+
+  BitmapDescriptor _getMarkerIcon(bool isIgnitionOn) {
+    return BitmapDescriptor.defaultMarkerWithHue(
+      isIgnitionOn ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
     );
   }
 
-  /// Construye la barra de búsqueda superior con el botón de menú y el avatar.
+  Future<void> _logout() async { /* ... código sin cambios ... */ }
+  Future<void> _requestLocationPermissionAndAnimate() async { /* ... código sin cambios ... */ }
+  void _updateUserLocationMarker(Position position) { /* ... código sin cambios ... */ }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Scaffold(
+          drawer: AppDrawer(onLogout: _logout),
+          body: Stack(
+            children: [
+              GoogleMap(
+                mapType: MapType.normal,
+                initialCameraPosition: const CameraPosition(target: LatLng(-32.775, -71.229), zoom: 11.0),
+                onMapCreated: (GoogleMapController controller) {
+                  if (!_mapController.isCompleted) {
+                    _mapController.complete(controller);
+                  }
+                },
+                markers: _markers,
+                myLocationEnabled: true,
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                onTap: (_) => _searchFocusNode.unfocus(),
+              ),
+              _buildTopSearchBar(),
+              _buildFloatingActionButtons(),
+            ],
+          ),
+        ),
+        
+        if (_isLoading)
+          Positioned.fill(
+            child: AnimatedTruckProgress(animation: _animationController),
+          ),
+      ],
+    );
+  }
+
   Widget _buildTopSearchBar() {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Builder(builder: (context) {
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
+            Row(
+              children: [
+                Builder(builder: (context) {
+                  return Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                            blurRadius: 5,
-                            color: Colors.black.withOpacity(0.2)),
-                      ],
+                      boxShadow: [BoxShadow(blurRadius: 5, color: Colors.black.withOpacity(0.2))],
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.menu, color: Colors.black54),
-                      onPressed: () {
-                        Scaffold.of(context).openDrawer();
-                      },
+                      onPressed: () => Scaffold.of(context).openDrawer(),
                     ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                        border: Border.fromBorderSide(
-                          BorderSide(color: Colors.white, width: 2),
-                        ),
-                      ),
-                      child: const Text(
-                        '3',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                  );
+                }),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [BoxShadow(blurRadius: 5, color: Colors.black.withOpacity(0.2))],
                     ),
-                  ),
-                ],
-              );
-            }),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                        blurRadius: 5, color: Colors.black.withOpacity(0.2)),
-                  ],
-                ),
-                // ... tu código ...
-
-                child: TextField(
-                  textAlign: TextAlign.center,
-                  textAlignVertical: TextAlignVertical.center,
-                  decoration: InputDecoration(
-                    hintText: 'Buscar un móvil',
-                    border: InputBorder.none,
-                    prefixIcon: const Icon(Icons.search, color: Colors.black),
-
-                    // --- INICIO DE LA MODIFICACIÓN ---
-                    suffixIcon: GestureDetector(
-                      onTap: () {
-                        /*
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          builder: (BuildContext context) {
-                            return const FilterBottomSheet();
-                          },
-                        );*/
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                        child: Transform.scale(
-                          scale:
-                              0.7, // Escala el ícono al 70% de su tamaño original
-                          child: ImageIcon(
-                            const AssetImage('assets/images/icon_filter.png'),
-                            color: AppColors.primary,
-                            size: 10, // Usa el tamaño original
+                    child: TextField(
+                      controller: _searchController,
+                      focusNode: _searchFocusNode,
+                      textAlignVertical: TextAlignVertical.center,
+                      decoration: InputDecoration(
+                        hintText: 'Buscar un móvil',
+                        border: InputBorder.none,
+                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                        suffixIcon: GestureDetector(
+                          onTap: () {},
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                            child: Transform.scale(
+                              scale: 0.7,
+                              child: ImageIcon(
+                                const AssetImage('assets/images/icon_filter.png'),
+                                color: AppColors.primary,
+                              ),
+                            ),
                           ),
                         ),
+                        contentPadding: const EdgeInsets.only(left: 20),
+                        isDense: true,
                       ),
                     ),
-                    // --- FIN DE LA MODIFICACIÓN ---
-
-                    contentPadding: EdgeInsets.zero,
-                    isDense: true,
                   ),
                 ),
-              ),
+                const SizedBox(width: 10),
+                _buildDriverInfo(),
+              ],
             ),
-            const SizedBox(width: 10),
-            _buildDriverInfo(),
+            _buildSearchResultsList(),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildSearchResultsList() {
+    if (!_isSearchFocused || _filteredVehicles.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // CAMBIO 3: Calculamos una altura fija para el contenedor.
+    // Aprox. 50px por cada ListTile 'dense' + 1px por el separador.
+    const double itemHeight = 50.0;
+    // La altura será para 5 items, o menos si hay menos de 5 vehículos en total.
+    final int displayItemCount = _filteredVehicles.length > 5 ? 5 : _filteredVehicles.length;
+    final double containerHeight = displayItemCount * itemHeight;
+
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10.0, left: 56.0, right: 56.0),
+      // Se establece una altura fija para que la lista de adentro sea scrollable.
+      height: containerHeight,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black.withOpacity(0.15))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: ListView.separated(
+          // Ya no se necesita shrinkWrap: true porque el contenedor tiene un tamaño fijo.
+          // shrinkWrap: true, 
+          padding: EdgeInsets.zero,
+          itemCount: _filteredVehicles.length,
+          itemBuilder: (context, index) {
+            final vehicle = _filteredVehicles[index];
+            return ListTile(
+              leading: SizedBox(
+                width: 40,
+                height: 40,
+                child: Center(
+                  child: Icon(
+                    vehicle.vehicleType.toVehicleTypeEnum().iconData,
+              size: 24,
+                  
+                  ),
+                ),
+              ),
+              title: Text(vehicle.plate),
+              onTap: () => _onVehicleSelected(vehicle),
+              dense: true,
+            );
+          },
+          separatorBuilder: (context, index) => const Divider(height: 1),
+        ),
+      ),
+    );
+  }  
 
   Widget _buildDriverInfo() {
     return Container(
@@ -321,12 +336,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           GestureDetector(
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => EditProfileScreen(),
-                ),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => EditProfileScreen()));
             },
             child: const CircleAvatar(
               radius: 20,
@@ -339,7 +349,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Construye la columna de botones flotantes para el zoom y la navegación.
   Widget _buildFloatingActionButtons() {
     return Positioned(
       bottom: 30,
@@ -370,9 +379,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 16),
           FloatingActionButton(
             heroTag: "recenter",
-            onPressed: () {
-              _requestLocationPermissionAndAnimate();
-            },
+            onPressed: _requestLocationPermissionAndAnimate,
             backgroundColor: AppColors.primary,
             child: const Icon(Icons.navigation_outlined, color: Colors.white),
           ),

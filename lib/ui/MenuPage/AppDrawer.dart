@@ -1,17 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:wisetrack_app/data/services/auth_api_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
-import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart'; // Asegúrate de importar el widget
 
-class AppDrawer extends StatefulWidget {
-  const AppDrawer({Key? key}) : super(key: key);
+// Ya no necesita ser StatefulWidget
+class AppDrawer extends StatelessWidget {
+  // 1. Acepta la función de callback en el constructor
+  final VoidCallback onLogout;
 
-  @override
-  _AppDrawerState createState() => _AppDrawerState();
-}
-
-class _AppDrawerState extends State<AppDrawer> {
-  bool _isLoading = false;
+  const AppDrawer({Key? key, required this.onLogout}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -22,109 +17,79 @@ class _AppDrawerState extends State<AppDrawer> {
           bottomRight: Radius.circular(30),
         ),
       ),
-      child: Stack(
-        children: [
-          Container(
-            color: Colors.white,
-            child: Column(
-              children: [
-                _buildDrawerHeader(),
-                Expanded(
-                  child: ListView(
-                    padding: EdgeInsets.zero,
-                    children: [
-                      _buildDrawerItem(
-                        context: context,
-                        icon: Icons.home_filled,
-                        title: 'Inicio',
-                        routeName: '/dashboard',
-                      ),
-                      _buildDrawerItem(
-                        context: context,
-                        icon: Icons.directions_bus,
-                        title: 'Móviles',
-                        routeName: '/mobiles',
-                      ),
-                      _buildDrawerItem(
-                        context: context,
-                        icon: Icons.dashboard,
-                        title: 'Dashboard',
-                        routeName: '/dashboard_combined',
-                      ),
-                      _buildDrawerItem(
-                        context: context,
-                        icon: Icons.insights,
-                        title: 'Auditorías',
-                        routeName: '/auditoria',
-                      ),
-                      _buildDrawerItem(
-                        context: context,
-                        icon: Icons.notifications,
-                        title: 'Notificaciones',
-                        routeName: '/notifications',
-                        trailing: _buildNotificationBadge('3'),
-                      ),
-                      _buildDrawerItem(
-                        context: context,
-                        icon: Icons.settings,
-                        title: 'Configuraciones',
-                        routeName: '/settings',
-                      ),
-                    ],
+      // Ya no necesita un Stack aquí
+      child: Container(
+        color: Colors.white,
+        child: Column(
+          children: [
+            _buildDrawerHeader(),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.home_filled,
+                    title: 'Inicio',
+                    routeName: '/dashboard',
                   ),
-                ),
-                const Divider(height: 1, color: Colors.black12),
-                _buildDrawerItem(
-                  context: context,
-                  icon: Icons.exit_to_app,
-                  title: 'Cerrar sesión',
-                  iconColor: Colors.blueGrey,
-                  onTap: () async {
-                    setState(() => _isLoading = true);
-
-                    // Ejecutar logout
-                    try {
-                      final response = await AuthService.logout();
-                      print('Logout response: ${response.detail}');
-
-                      // Redirigir a la pantalla de login
-                      Navigator.of(context).pop(); // Cierra el Drawer
-                      Navigator.of(context).pushReplacementNamed('/login');
-                    } catch (e) {
-                      print('Error durante logout: $e');
-
-                      // Mostrar SnackBar con error (opcional)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error al cerrar sesión: $e')),
-                      );
-
-                      // Redirigir a login incluso si hay error
-                      Navigator.of(context).pop(); // Cierra el Drawer
-                      Navigator.of(context).pushReplacementNamed('/login');
-                    } finally {
-                      if (mounted) {
-                        setState(() => _isLoading = false);
-                      }
-                    }
-                  },
-                ),
-                const Divider(height: 1, color: Colors.black12),
-                _buildFooter(),
-              ],
-            ),
-          ),
-          if (_isLoading)
-            Center(
-              child: AnimatedTruckProgress(
-                progress: 1.0, // Progreso completo para simular carga
-                duration: const Duration(milliseconds: 400),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.directions_bus,
+                    title: 'Móviles',
+                    routeName: '/mobiles',
+                  ),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.dashboard,
+                    title: 'Dashboard',
+                    routeName: '/dashboard_combined',
+                  ),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.insights,
+                    title: 'Auditorías',
+                    routeName: '/auditoria',
+                  ),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.notifications,
+                    title: 'Notificaciones',
+                    routeName: '/notifications',
+                    trailing: _buildNotificationBadge('3'),
+                  ),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.settings,
+                    title: 'Configuraciones',
+                    routeName: '/settings',
+                  ),
+                ],
               ),
-            ), // Indicador de carga como overlay
-        ],
+            ),
+            const Divider(height: 1, color: Colors.black12),
+            _buildDrawerItem(
+              context: context,
+              icon: Icons.exit_to_app,
+              title: 'Cerrar sesión',
+              iconColor: Colors.blueGrey,
+              // 2. El onTap ahora simplemente llama al callback
+              onTap: () {
+                // Primero cierra el drawer para que se vea la animación en la pantalla completa
+                Navigator.of(context).pop(); 
+                // Luego llama a la función de logout que vive en DashboardScreen
+                onLogout();
+              },
+            ),
+            const Divider(height: 1, color: Colors.black12),
+            _buildFooter(),
+          ],
+        ),
       ),
     );
   }
 
+  // --- El resto de los widgets de construcción no cambian ---
   Widget _buildDrawerHeader() {
     return const Padding(
       padding: EdgeInsets.fromLTRB(24, 60, 24, 20),
@@ -157,8 +122,7 @@ class _AppDrawerState extends State<AppDrawer> {
     return ListTile(
       selected: isSelected,
       selectedTileColor: AppColors.primary.withOpacity(0.1),
-      leading: Icon(icon,
-          color: isSelected ? AppColors.primary : iconColor, size: 28),
+      leading: Icon(icon, color: isSelected ? AppColors.primary : iconColor, size: 28),
       title: Text(
         title,
         style: TextStyle(
@@ -167,8 +131,7 @@ class _AppDrawerState extends State<AppDrawer> {
           color: isSelected ? AppColors.primary : Colors.black87,
         ),
       ),
-      trailing: trailing ??
-          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+      trailing: trailing,
       onTap: onTap ??
           () {
             Navigator.of(context).pop();
@@ -180,23 +143,16 @@ class _AppDrawerState extends State<AppDrawer> {
   }
 
   Widget _buildNotificationBadge(String count) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.red,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            count,
-            style: const TextStyle(color: Colors.white, fontSize: 12),
-          ),
-        ),
-        const SizedBox(width: 8),
-        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.red,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        count,
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+      ),
     );
   }
 

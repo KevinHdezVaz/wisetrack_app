@@ -114,48 +114,47 @@ extension VehicleTypeIntExtension on int {
 
 // <--- NUEVA EXTENSIÓN: imageAssetPath y defaultIconData son ahora métodos de VehicleTypeEnum ---
 extension VehicleTypeEnumExtension on VehicleTypeEnum {
-  String get imageAssetPath {
+  IconData get iconData {
     switch (this) {
-      // Usamos 'this' porque es una extensión de VehicleTypeEnum
       case VehicleTypeEnum.lightVehicle:
-        return 'assets/icons/vehicle_light.png';
+        return Icons.directions_car;
       case VehicleTypeEnum.bus:
-        return 'assets/icons/vehicle_bus.png';
+        return Icons.directions_bus;
       case VehicleTypeEnum.truck:
-        return 'assets/icons/vehicle_truck.png';
+        return Icons.local_shipping;
       case VehicleTypeEnum.tracto:
-        return 'assets/icons/vehicle_tracto.png';
+        return Icons.airport_shuttle;
       case VehicleTypeEnum.ramplaSeca:
-        return 'assets/icons/vehicle_rampla_seca.png';
+        return Icons.fire_truck;
       case VehicleTypeEnum.ramplaFria:
-        return 'assets/icons/vehicle_rampla_fria.png';
+        return Icons.airport_shuttle;
       case VehicleTypeEnum.camion3_4:
-        return 'assets/icons/vehicle_camion_3_4.png';
+        return Icons.local_shipping;
       case VehicleTypeEnum.camaBaja:
-        return 'assets/icons/vehicle_cama_baja.png';
+        return Icons.airport_shuttle;
       case VehicleTypeEnum.cistern:
-        return 'assets/icons/vehicle_cisterna.png';
+        return Icons.local_shipping;
       case VehicleTypeEnum.tolva:
-        return 'assets/icons/vehicle_tolva.png';
+        return Icons.inventory;
       case VehicleTypeEnum.caex:
-        return 'assets/icons/vehicle_caex.png';
+        return Icons.construction;
       case VehicleTypeEnum.forklift:
-        return 'assets/icons/vehicle_forklift.png';
+        return Icons.forklift;
       case VehicleTypeEnum.crane:
-        return 'assets/icons/vehicle_crane.png';
+        return Icons.cable;
       case VehicleTypeEnum.fireTruck:
-        return 'assets/icons/vehicle_fire_truck.png';
+        return Icons.fire_truck;
       case VehicleTypeEnum.van:
-        return 'assets/icons/vehicle_van.png';
+        return Icons.airport_shuttle;
       case VehicleTypeEnum.excavator:
-        return 'assets/icons/vehicle_excavator.png';
+        return Icons.construction;
       case VehicleTypeEnum.loader:
-        return 'assets/icons/vehicle_loader.png';
+        return Icons.construction;
       case VehicleTypeEnum.other:
-        return 'assets/icons/vehicle_other.png';
+        return Icons.directions_car;
       case VehicleTypeEnum.unknown:
       default:
-        return 'assets/icons/vehicle_unknown.png';
+        return Icons.help_outline;
     }
   }
 

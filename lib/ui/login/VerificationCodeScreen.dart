@@ -5,18 +5,18 @@ import 'package:pinput/pinput.dart';
 import 'package:wisetrack_app/data/services/auth_api_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/login/ResetPasswordScreenUpdated.dart';
-import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart'; // Importa el nuevo widget
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String email;
-  const OtpVerificationScreen({Key? key, required this.email})
-      : super(key: key);
+  const OtpVerificationScreen({Key? key, required this.email}) : super(key: key);
 
   @override
   _OtpVerificationScreenState createState() => _OtpVerificationScreenState();
 }
 
-class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
+// 1. Añadir el TickerProviderStateMixin
+class _OtpVerificationScreenState extends State<OtpVerificationScreen> with TickerProviderStateMixin {
   final _pinController = TextEditingController();
   bool _isNextButtonEnabled = false;
   bool _isResendButtonEnabled = false;
@@ -24,19 +24,31 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   Timer? _timer;
   int _countdown = 84;
 
-  @override
-  void initState() {
-    super.initState();
-    _pinController.addListener(_updateButtonState);
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      _requestInitialCode();
-    });
-  }
+  // 2. Declarar el AnimationController
+  late AnimationController _animationController;
+
+// EN: OtpVerificationScreen.dart
+
+@override
+void initState() {
+  super.initState();
+  _pinController.addListener(_updateButtonState);
+
+  // 3. Inicializar el AnimationController (si lo tienes aquí, mantenlo)
+  _animationController = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 4),
+  );
+
+  // Simplemente iniciamos el contador, ya que el código se solicitó en la pantalla anterior.
+  _startCountdown(); 
+}
 
   @override
   void dispose() {
     _timer?.cancel();
     _pinController.dispose();
+    _animationController.dispose(); // 4. No olvidar desechar el controlador
     super.dispose();
   }
 
@@ -58,22 +70,25 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         if (mounted) setState(() => _countdown--);
       } else {
         if (mounted) {
-          setState(() {
-            _isResendButtonEnabled = true;
-          });
+          setState(() => _isResendButtonEnabled = true);
           _timer?.cancel();
         }
       }
     });
   }
 
+  // --- 5. MODIFICACIÓN DE LOS MÉTODOS ASÍNCRONOS ---
+
   Future<void> _requestInitialCode() async {
-    if (mounted) {
-      setState(() => _isLoading = true);
-    }
+    if (mounted) setState(() => _isLoading = true);
+    _animationController.repeat(); // Inicia animación
 
     try {
       final response = await AuthService.requestPasswordReset(widget.email);
+      await _animationController.forward(from: _animationController.value); // Completa la animación
+      _animationController.stop();
+
+      if (!mounted) return;
 
       if (response.success) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -86,12 +101,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      if (mounted) {
+        _animationController.stop();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
+        _animationController.reset();
       }
     }
   }
@@ -100,9 +117,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (_isLoading || !_isResendButtonEnabled) return;
 
     setState(() => _isLoading = true);
+    _animationController.repeat(); // Inicia animación
 
     try {
       final response = await AuthService.requestPasswordReset(widget.email);
+      await _animationController.forward(from: _animationController.value); // Completa la animación
+      _animationController.stop();
+
+      if (!mounted) return;
 
       if (response.success) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -111,17 +133,18 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         _startCountdown();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(response.message ?? 'Error al reenviar código')),
+          SnackBar(content: Text(response.message ?? 'Error al reenviar código')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      if (mounted) {
+        _animationController.stop();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
+        _animationController.reset();
       }
     }
   }
@@ -130,12 +153,17 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (_isLoading) return;
 
     setState(() => _isLoading = true);
+    _animationController.repeat(); // Inicia animación
 
     try {
       final response = await AuthService.verifyMfaCode(
         email: widget.email,
         code: _pinController.text,
       );
+      await _animationController.forward(from: _animationController.value); // Completa la animación
+      _animationController.stop();
+
+      if (!mounted) return;
 
       if (response.success) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -144,8 +172,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                ResetPasswordScreenUpdated(email: widget.email),
+            builder: (context) => ResetPasswordScreenUpdated(email: widget.email),
           ),
         );
       } else {
@@ -154,12 +181,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      if (mounted) {
+        _animationController.stop();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
+        _animationController.reset();
       }
     }
   }
@@ -210,23 +239,27 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
             left: 16.0,
             child: _buildBackButton(context),
           ),
+          // --- 6. MODIFICACIÓN DEL INDICADOR DE CARGA ---
           if (_isLoading)
             Center(
               child: AnimatedTruckProgress(
-                progress: 1.0, // Progreso completo para simular carga
-                duration: const Duration(milliseconds: 400),
+                // Se pasa el controlador completo
+                animation: _animationController,
               ),
-            ), // Indicador de carga como overlay
+            ),
         ],
       ),
     );
   }
 
+  // --- El resto de tus widgets (_buildBackButton, _buildBackground, etc.) no necesitan cambios ---
+  // --- Puedes copiarlos y pegarlos tal cual los tenías ---
+
   Widget _buildBackButton(BuildContext context) {
     return IconButton(
       padding: EdgeInsets.zero,
       icon: Image.asset(
-        'assets/images/backbtn.png',
+        'assets/images/backbtn.png', // Asegúrate de tener esta imagen
         width: 50,
         height: 50,
       ),
@@ -235,6 +268,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   }
 
   Widget _buildBackground(BuildContext context) {
+    // Asegúrate de tener estas imágenes en tus assets
     return Stack(
       children: [
         Positioned(

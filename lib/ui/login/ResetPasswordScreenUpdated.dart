@@ -1,46 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:wisetrack_app/data/services/auth_api_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
-import 'dart:convert'; // Para base64Encode si es necesario
-import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart'; // Importa el nuevo widget
+import 'dart:convert';
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart'; // Importa el widget modificado
 
 class ResetPasswordScreenUpdated extends StatefulWidget {
-  final String email; // Corrección del constructor
-  const ResetPasswordScreenUpdated({Key? key, required this.email})
-      : super(key: key);
+  final String email;
+  const ResetPasswordScreenUpdated({Key? key, required this.email}) : super(key: key);
 
   @override
-  _ResetPasswordScreenUpdatedState createState() =>
-      _ResetPasswordScreenUpdatedState();
+  _ResetPasswordScreenUpdatedState createState() => _ResetPasswordScreenUpdatedState();
 }
 
 enum PasswordStrength { none, weak, acceptable, secure }
 
-class _ResetPasswordScreenUpdatedState
-    extends State<ResetPasswordScreenUpdated> {
+class _ResetPasswordScreenUpdatedState extends State<ResetPasswordScreenUpdated> with TickerProviderStateMixin {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
-  bool _isLoading = false; // Estado para el indicador de carga
-  String? _errorMessage; // Estado para mensajes de error
+  bool _isLoading = false;
+  String? _errorMessage;
 
   bool _hasMinLength = true;
   bool _hasMixedCase = true;
   bool _hasNumber = true;
   bool _hasSpecialChar = true;
   bool _passwordsMatch = false;
-
   bool _userHasTyped = false;
 
   PasswordStrength _strength = PasswordStrength.none;
+  
+  // Controlador para la animación
+  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
     _passwordController.addListener(_validatePassword);
     _confirmPasswordController.addListener(_validatePassword);
+
+    // Inicializar el Animation Controller
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2), // Duración de un ciclo completo de la animación
+    );
   }
 
   @override
@@ -49,6 +54,7 @@ class _ResetPasswordScreenUpdatedState
     _confirmPasswordController.removeListener(_validatePassword);
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _animationController.dispose(); // ¡Importante desechar el controlador!
     super.dispose();
   }
 
@@ -101,7 +107,6 @@ class _ResetPasswordScreenUpdatedState
   }
 
   bool get _isButtonEnabled {
-    // Habilitar el botón si la fuerza es al menos "acceptable" y las contraseñas coinciden
     return _userHasTyped &&
         _passwordsMatch &&
         (_strength == PasswordStrength.acceptable ||
@@ -109,6 +114,7 @@ class _ResetPasswordScreenUpdatedState
         !_isLoading;
   }
 
+  // CORRECCIÓN: Eliminada la declaración duplicada del método
   Future<void> _resetPassword() async {
     if (!_isButtonEnabled) return;
 
@@ -117,37 +123,50 @@ class _ResetPasswordScreenUpdatedState
       _errorMessage = null;
     });
 
+    // Inicia la animación en bucle para indicar que algo está cargando
+    _animationController.repeat();
+
     try {
       final response = await AuthService.setNewPassword(
         email: widget.email,
-        newPass: base64Encode(
-            utf8.encode(_passwordController.text)), // Codificación Base64
-        newPassCheck:
-            base64Encode(utf8.encode(_confirmPasswordController.text)),
+        newPass: base64Encode(utf8.encode(_passwordController.text)),
+        newPassCheck: base64Encode(utf8.encode(_confirmPasswordController.text)),
       );
+      
+      // Cuando la respuesta llega, detiene el bucle y anima el camión hasta el final
+      _animationController.forward(from: _animationController.value).whenCompleteOrCancel(() {
+        _animationController.stop();
 
-      if (response.success) {
-        // Éxito: Navegar a la pantalla de verificación o login
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text(response.message ?? 'Contraseña cambiada con éxito')),
-        );
-        Navigator.pushReplacementNamed(
-            context, '/login'); // Ajusta la ruta según tu app
-      } else {
-        setState(() {
-          _errorMessage = response.message ?? 'Error al cambiar la contraseña';
-        });
-      }
+        if (response.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response.message ?? 'Contraseña cambiada con éxito')),
+          );
+          // Asegúrate que el widget sigue montado antes de navegar
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/login');
+          }
+        } else {
+          setState(() {
+            _errorMessage = response.message ?? 'Error al cambiar la contraseña';
+          });
+        }
+      });
+
     } catch (e) {
+      _animationController.stop();
       setState(() {
         _errorMessage = 'Error de conexión: $e';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      // Espera un momento para que el usuario vea la animación completarse
+      await Future.delayed(const Duration(milliseconds: 500));
+      // Solo modifica el estado si el widget sigue "montado" (visible)
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _animationController.reset(); // Resetea la animación para la próxima vez
+      }
     }
   }
 
@@ -176,6 +195,7 @@ class _ResetPasswordScreenUpdatedState
                       child: Text(
                         _errorMessage!,
                         style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ],
@@ -193,19 +213,23 @@ class _ResetPasswordScreenUpdatedState
             left: 16.0,
             child: _buildBackButton(context),
           ),
+          // Muestra el widget de carga si _isLoading es true
           if (_isLoading)
             Center(
               child: AnimatedTruckProgress(
-                progress: 1.0, // Progreso completo para simular carga
-                duration: const Duration(milliseconds: 400),
+                // Pasa la animación al widget
+                animation: _animationController,
               ),
-            ), // Indicador de carga como overlay
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildBackButton(BuildContext context) {
+  // --- El resto de tus widgets (_buildBackButton, _buildStrengthIndicator, etc.) no necesitan cambios ---
+  // --- Puedes copiarlos y pegarlos tal cual los tenías ---
+
+   Widget _buildBackButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
         try {

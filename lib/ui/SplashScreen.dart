@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:wisetrack_app/ui/IntroPage/OnboardingWrapper.dart';
-import 'package:wisetrack_app/ui/login/LoginScreen.dart';
-import 'package:wisetrack_app/utils/Preferences.dart';
+
+// No necesitamos importar las otras pantallas aquí
+// import 'package:wisetrack_app/ui/IntroPage/OnboardingWrapper.dart';
+// import 'package:wisetrack_app/ui/login/LoginScreen.dart';
+// import 'package:wisetrack_app/utils/Preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -25,6 +27,7 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(seconds: 2),
     );
 
+    // Las animaciones se quedan exactamente igual
     _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -39,25 +42,19 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
+    // MODIFICADO: Simplificamos la lógica de navegación
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Mantenemos el delay inicial para que la animación se vea
       await Future.delayed(const Duration(seconds: 2));
 
       if (!mounted) return;
 
-      bool hasSeenOnboarding = false;
-      try {
-        hasSeenOnboarding = await Preferences.hasSeenOnboarding();
-      } catch (e) {
-        print('Error checking onboarding status: $e');
-      }
+      // Ya no revisamos el estado de onboarding aquí.
 
-      if (!mounted) return;
-
+      // Iniciamos la animación de salida y LUEGO navegamos.
       _controller.forward().then((_) {
-        Navigator.pushReplacementNamed(
-          context,
-          hasSeenOnboarding ? '/login' : '/onboarding',
-        );
+        // Navegamos SIEMPRE a la misma ruta: nuestro widget decisor.
+        Navigator.pushReplacementNamed(context, '/auth_wrapper');
       });
     });
   }
@@ -70,6 +67,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    // El widget build se queda exactamente igual.
     return Scaffold(
       backgroundColor: const Color(0xFF008C95),
       body: AnimatedBuilder(

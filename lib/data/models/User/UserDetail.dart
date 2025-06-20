@@ -1,28 +1,38 @@
 class UserDetail {
-  final String id;
   final String username;
-  final String email;
-  final String? fullName;
-  final String? company;
-  final String? role;
+  final String? name;
+  final String? lastname;
+  final int? company; // Cambiado a int? para coincidir con el JSON
+  final String? phone;
+  final List<String>
+      permission; // Cambiado a List<String> para el arreglo permission
 
   UserDetail({
-    required this.id,
     required this.username,
-    required this.email,
-    this.fullName,
+    this.name,
+    this.lastname,
     this.company,
-    this.role,
+    this.phone,
+    required this.permission,
   });
 
   factory UserDetail.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>;
+
     return UserDetail(
-      id: json['id']?.toString() ?? '',
-      username: json['username'] ?? '',
-      email: json['email'] ?? '',
-      fullName: json['full_name'],
-      company: json['company'],
-      role: json['role'],
+      username: data['username'] ?? '',
+      name: data['name'],
+      lastname: data['lastname'],
+      company: data['company'], // Se mantiene como int? (puede ser null)
+      phone: data['phone'],
+      permission: List<String>.from(data['permission'] ?? []),
     );
+  }
+
+  String? get fullName {
+    if (name == null && lastname == null) return null;
+    if (name == null) return lastname;
+    if (lastname == null) return name;
+    return '$name $lastname';
   }
 }

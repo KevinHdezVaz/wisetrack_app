@@ -1,14 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:pinput/pinput.dart';
+import 'package:wisetrack_app/data/services/auth_api_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/login/ResetPasswordScreenUpdated.dart';
-
-// Asumo que sigues usando tu archivo de colores.
-// import 'path/to/app_colors.dart';
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart'; // Importa el nuevo widget
 
 class OtpVerificationScreen extends StatefulWidget {
-  const OtpVerificationScreen({Key? key}) : super(key: key);
+  final String email;
+  const OtpVerificationScreen({Key? key, required this.email})
+      : super(key: key);
 
   @override
   _OtpVerificationScreenState createState() => _OtpVerificationScreenState();
@@ -18,36 +20,148 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   final _pinController = TextEditingController();
   bool _isNextButtonEnabled = false;
   bool _isResendButtonEnabled = false;
-
-  late Timer _timer;
-  int _countdown = 84; // 1 minuto y 24 segundos como en la imagen
+  bool _isLoading = false;
+  Timer? _timer;
+  int _countdown = 84;
 
   @override
   void initState() {
     super.initState();
-    startTimer();
+    _pinController.addListener(_updateButtonState);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _requestInitialCode();
+    });
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _timer?.cancel();
     _pinController.dispose();
     super.dispose();
   }
 
-  void startTimer() {
+  void _updateButtonState() {
+    setState(() {
+      _isNextButtonEnabled = _pinController.text.length == 5;
+    });
+  }
+
+  void _startCountdown() {
     setState(() {
       _isResendButtonEnabled = false;
       _countdown = 84;
     });
+
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_countdown > 0) {
-        setState(() => _countdown--);
+        if (mounted) setState(() => _countdown--);
       } else {
-        setState(() => _isResendButtonEnabled = true);
-        _timer.cancel();
+        if (mounted) {
+          setState(() {
+            _isResendButtonEnabled = true;
+          });
+          _timer?.cancel();
+        }
       }
     });
+  }
+
+  Future<void> _requestInitialCode() async {
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
+
+    try {
+      final response = await AuthService.requestPasswordReset(widget.email);
+
+      if (response.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.message ?? 'Código enviado')),
+        );
+        _startCountdown();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.message ?? 'Error al enviar código')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _resendCodeAndRestartTimer() async {
+    if (_isLoading || !_isResendButtonEnabled) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await AuthService.requestPasswordReset(widget.email);
+
+      if (response.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.message ?? 'Código reenviado')),
+        );
+        _startCountdown();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(response.message ?? 'Error al reenviar código')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _verifyCode() async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await AuthService.verifyMfaCode(
+        email: widget.email,
+        code: _pinController.text,
+      );
+
+      if (response.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.message ?? 'Código verificado')),
+        );
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                ResetPasswordScreenUpdated(email: widget.email),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.message ?? 'Código inválido')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   String get formattedTime {
@@ -72,7 +186,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                     const SizedBox(height: 120),
                     _buildHeader(),
                     const SizedBox(height: 80),
-                    Align(
+                    const Align(
                       alignment: Alignment.topLeft,
                       child: Text('Código de verificación',
                           style: TextStyle(
@@ -96,6 +210,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
             left: 16.0,
             child: _buildBackButton(context),
           ),
+          if (_isLoading)
+            Center(
+              child: AnimatedTruckProgress(
+                progress: 1.0, // Progreso completo para simular carga
+                duration: const Duration(milliseconds: 400),
+              ),
+            ), // Indicador de carga como overlay
         ],
       ),
     );
@@ -180,7 +301,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         setState(() => _isNextButtonEnabled = value.length == 5);
       },
       onCompleted: (pin) {
-        // Lógica para cuando el código se completa
         setState(() => _isNextButtonEnabled = true);
       },
     );
@@ -203,14 +323,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
-            onPressed: _isResendButtonEnabled ? () => startTimer() : null,
+            onPressed: _isResendButtonEnabled && !_isLoading
+                ? _resendCodeAndRestartTimer
+                : null,
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                  vertical: 10), // Reducido de 16 a 10
-              minimumSize: const Size(
-                  0, 40), // Altura mínima de 40 (en lugar del default 48)
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              minimumSize: const Size(0, 40),
               side: BorderSide(
-                  color: _isResendButtonEnabled
+                  color: _isResendButtonEnabled && !_isLoading
                       ? AppColors.primary
                       : AppColors.disabled,
                   width: 1.5),
@@ -221,35 +341,26 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
             child: Text(
               'Reenviar código',
               style: TextStyle(
-                fontSize: 14, // Opcional: reducir tamaño de texto
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: _isResendButtonEnabled
+                color: _isResendButtonEnabled && !_isLoading
                     ? AppColors.primary
                     : AppColors.disabled,
               ),
             ),
           ),
         ),
-        const SizedBox(height: 12), // Reducido el espacio entre botones
+        const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _isNextButtonEnabled
-                ? () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ResetPasswordScreenUpdated(),
-                      ),
-                    );
-                  }
-                : null,
+            onPressed: _isNextButtonEnabled && !_isLoading ? _verifyCode : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              disabledBackgroundColor: AppColors.disabled,
-              padding: const EdgeInsets.symmetric(
-                  vertical: 10), // Reducido de 16 a 10
-              minimumSize: const Size(0, 50), // Altura mínima de 40
+              backgroundColor: _isNextButtonEnabled && !_isLoading
+                  ? AppColors.primary
+                  : AppColors.disabled,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              minimumSize: const Size(0, 50),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.0)),
             ),

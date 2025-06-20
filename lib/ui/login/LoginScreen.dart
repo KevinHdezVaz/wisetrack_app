@@ -7,6 +7,7 @@ import 'package:wisetrack_app/ui/MenuPage/DashboardScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/login/ForgotPasswordScreen.dart';
 import 'package:wisetrack_app/utils/constants.dart'; // Asegúrate de importar esto
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart'; // Importa el widget corregido
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -15,21 +16,28 @@ class LoginScreen extends StatefulWidget {
   _LoginScreenState createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   bool _isPasswordVisible = false;
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _companyController = TextEditingController();
-  bool _isButtonEnabled = false; // Estado para habilitar/deshabilitar el botón
-  bool _isLoading = false; // Estado para el indicador de progreso
+  bool _isButtonEnabled = false;
+  bool _isLoading = false;
+  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
-    // Escuchar cambios en los controladores para actualizar el estado del botón
     _usernameController.addListener(_updateButtonState);
     _passwordController.addListener(_updateButtonState);
     _companyController.addListener(_updateButtonState);
+    _animationController = AnimationController(
+        vsync: this,
+        duration: const Duration(seconds: 3)) // Duración estimada inicial
+      ..addListener(() {
+        setState(() {});
+      });
   }
 
   @override
@@ -37,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _usernameController.dispose();
     _passwordController.dispose();
     _companyController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -67,9 +76,9 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(),
-            ), // Indicador de progreso
+            AnimatedTruckProgress(
+              progress: _animationController.value,
+            ), // Indicador de progreso con animación de camión
         ],
       ),
     );
@@ -293,12 +302,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    print('Botón presionado, llamando a _login');
     if (!_isButtonEnabled) return;
 
     setState(() {
-      _isLoading = true; // Mostrar el CircularProgressIndicator
+      _isLoading = true;
     });
+
+    _animationController.reset();
+    _animationController.forward();
 
     try {
       final loginResponse = await AuthService.login(
@@ -309,6 +320,8 @@ class _LoginScreenState extends State<LoginScreen> {
       print('Respuesta del servicio: ${loginResponse.toString()}');
 
       if (loginResponse.token.isNotEmpty) {
+        await _animationController.animateTo(1.0,
+            duration: const Duration(milliseconds: 500));
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => DashboardScreen()),
@@ -317,18 +330,22 @@ class _LoginScreenState extends State<LoginScreen> {
           const SnackBar(content: Text('Inicio de sesión exitoso')),
         );
       } else {
+        await _animationController.animateTo(1.0,
+            duration: const Duration(milliseconds: 500));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: ${loginResponse.error}')),
         );
       }
     } catch (e) {
+      await _animationController.animateTo(1.0,
+          duration: const Duration(milliseconds: 500));
       print('Excepción en _login: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error de conexión: $e')),
       );
     } finally {
       setState(() {
-        _isLoading = false; // Ocultar el CircularProgressIndicator
+        _isLoading = false;
       });
     }
   }

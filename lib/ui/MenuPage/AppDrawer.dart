@@ -1,10 +1,17 @@
-// archivo: app_drawer.dart
 import 'package:flutter/material.dart';
+import 'package:wisetrack_app/data/services/auth_api_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
-// import 'path/to/app_colors.dart';
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart'; // Asegúrate de importar el widget
 
-class AppDrawer extends StatelessWidget {
+class AppDrawer extends StatefulWidget {
   const AppDrawer({Key? key}) : super(key: key);
+
+  @override
+  _AppDrawerState createState() => _AppDrawerState();
+}
+
+class _AppDrawerState extends State<AppDrawer> {
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -15,76 +22,105 @@ class AppDrawer extends StatelessWidget {
           bottomRight: Radius.circular(30),
         ),
       ),
-      child: Container(
-        color: Colors.white,
-        child: Column(
-          children: [
-            _buildDrawerHeader(),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  // --- INICIO DE LA MODIFICACIÓN ---
-                  // Pasamos el contexto y la ruta a la que queremos navegar
-                  _buildDrawerItem(
-                      context: context,
-                      icon: Icons.home_filled,
-                      title: 'Inicio',
-                      routeName:
-                          '/dashboard' // Puedes usar la misma ruta del dashboard o crear una nueva
+      child: Stack(
+        children: [
+          Container(
+            color: Colors.white,
+            child: Column(
+              children: [
+                _buildDrawerHeader(),
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      _buildDrawerItem(
+                        context: context,
+                        icon: Icons.home_filled,
+                        title: 'Inicio',
+                        routeName: '/dashboard',
                       ),
-                  _buildDrawerItem(
-                      context: context,
-                      icon: Icons.directions_bus,
-                      title: 'Móviles',
-                      routeName:
-                          '/mobiles' // La nueva ruta para la pantalla de Móviles
+                      _buildDrawerItem(
+                        context: context,
+                        icon: Icons.directions_bus,
+                        title: 'Móviles',
+                        routeName: '/mobiles',
                       ),
-                  _buildDrawerItem(
-                      context: context,
-                      icon: Icons.dashboard,
-                      title: 'Dashboard',
-                      routeName: '/dashboard_combined'),
-
-                  // ... resto de los items ...
-                  _buildDrawerItem(
-                      context: context,
-                      icon: Icons.insights,
-                      title: 'Auditorías',
-                      routeName:
-                          '/auditoria' // Descomentar cuando tengas la pantalla
+                      _buildDrawerItem(
+                        context: context,
+                        icon: Icons.dashboard,
+                        title: 'Dashboard',
+                        routeName: '/dashboard_combined',
                       ),
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.notifications,
-                    title: 'Notificaciones',
-                    routeName:
-                        '/notifications', // Descomentar cuando tengas la pantalla
-                    trailing: _buildNotificationBadge('3'),
+                      _buildDrawerItem(
+                        context: context,
+                        icon: Icons.insights,
+                        title: 'Auditorías',
+                        routeName: '/auditoria',
+                      ),
+                      _buildDrawerItem(
+                        context: context,
+                        icon: Icons.notifications,
+                        title: 'Notificaciones',
+                        routeName: '/notifications',
+                        trailing: _buildNotificationBadge('3'),
+                      ),
+                      _buildDrawerItem(
+                        context: context,
+                        icon: Icons.settings,
+                        title: 'Configuraciones',
+                        routeName: '/settings',
+                      ),
+                    ],
                   ),
-                  _buildDrawerItem(
-                      context: context,
-                      icon: Icons.settings,
-                      title: 'Configuraciones',
-                      routeName:
-                          '/settings' // Descomentar cuando tengas la pantalla
-                      ),
-                  // --- FIN DE LA MODIFICACIÓN ---
-                ],
+                ),
+                const Divider(height: 1, color: Colors.black12),
+                _buildDrawerItem(
+                  context: context,
+                  icon: Icons.exit_to_app,
+                  title: 'Cerrar sesión',
+                  iconColor: Colors.blueGrey,
+                  onTap: () async {
+                    setState(() => _isLoading = true);
+
+                    // Ejecutar logout
+                    try {
+                      final response = await AuthService.logout();
+                      print('Logout response: ${response.detail}');
+
+                      // Redirigir a la pantalla de login
+                      Navigator.of(context).pop(); // Cierra el Drawer
+                      Navigator.of(context).pushReplacementNamed('/login');
+                    } catch (e) {
+                      print('Error durante logout: $e');
+
+                      // Mostrar SnackBar con error (opcional)
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error al cerrar sesión: $e')),
+                      );
+
+                      // Redirigir a login incluso si hay error
+                      Navigator.of(context).pop(); // Cierra el Drawer
+                      Navigator.of(context).pushReplacementNamed('/login');
+                    } finally {
+                      if (mounted) {
+                        setState(() => _isLoading = false);
+                      }
+                    }
+                  },
+                ),
+                const Divider(height: 1, color: Colors.black12),
+                _buildFooter(),
+              ],
+            ),
+          ),
+          if (_isLoading)
+            Center(
+              child: AnimatedTruckProgress(
+                progress: 1.0, // Progreso completo para simular carga
+                duration: const Duration(milliseconds: 400),
               ),
-            ),
-            const Divider(height: 1, color: Colors.black12),
-            _buildDrawerItem(
-              context: context,
-              icon: Icons.exit_to_app,
-              title: 'Cerrar sesión',
-              iconColor: Colors.blueGrey,
-              // onTap: () { /* Lógica especial para cerrar sesión */ }
-            ),
-            const Divider(height: 1, color: Colors.black12),
-            _buildFooter(),
-          ],
-        ),
+            ), // Indicador de carga como overlay
+        ],
       ),
     );
   }
@@ -97,50 +133,46 @@ class AppDrawer extends StatelessWidget {
         child: Text(
           'Hola Francisca!',
           style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textDark),
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textDark,
+          ),
         ),
       ),
     );
   }
 
   Widget _buildDrawerItem({
-    required BuildContext context, // Necesario para la navegación
+    required BuildContext context,
     required IconData icon,
     required String title,
-    String? routeName, // La ruta a la que se va a navegar
+    String? routeName,
     Widget? trailing,
     Color iconColor = AppColors.primary,
-    VoidCallback?
-        onTap, // Mantenemos onTap para acciones especiales como logout
+    VoidCallback? onTap,
   }) {
-    // Obtenemos la ruta actual para saber si el ítem está seleccionado
     final String? currentRoute = ModalRoute.of(context)?.settings.name;
     final bool isSelected = currentRoute == routeName;
 
     return ListTile(
-      selected: isSelected, // Marca el ítem como seleccionado
-      selectedTileColor: AppColors.primary
-          .withOpacity(0.1), // Color de fondo cuando está seleccionado
+      selected: isSelected,
+      selectedTileColor: AppColors.primary.withOpacity(0.1),
       leading: Icon(icon,
           color: isSelected ? AppColors.primary : iconColor, size: 28),
-      title: Text(title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? AppColors.primary : Colors.black87,
-          )),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected ? AppColors.primary : Colors.black87,
+        ),
+      ),
       trailing: trailing ??
           const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
       onTap: onTap ??
           () {
-            // Cerramos el drawer primero
             Navigator.of(context).pop();
-
             if (routeName != null && !isSelected) {
-              // Usamos pushNamed para navegar a la ruta definida.
-              // Usamos pushReplacementNamed si no queremos que el usuario pueda volver atrás.
               Navigator.of(context).pushNamed(routeName);
             }
           },
@@ -157,8 +189,10 @@ class AppDrawer extends StatelessWidget {
             color: Colors.red,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Text(count,
-              style: const TextStyle(color: Colors.white, fontSize: 12)),
+          child: Text(
+            count,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
         ),
         const SizedBox(width: 8),
         const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),

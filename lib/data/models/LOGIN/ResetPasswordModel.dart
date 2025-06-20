@@ -20,19 +20,19 @@ class MfaVerification {
 // Modelo para cambio de contraseña
 class NewPasswordData {
   final String email;
-  final String newPassword;
-  final String confirmation;
+  final String newPass;
+  final String newPassCheck;
 
   NewPasswordData({
     required this.email,
-    required this.newPassword,
-    required this.confirmation,
+    required this.newPass,
+    required this.newPassCheck,
   });
 
   Map<String, dynamic> toJson() => {
         'email': email,
-        'new_pass': newPassword,
-        'new_pass_check': confirmation,
+        'new_pass': newPass,
+        'new_pass_check': newPassCheck,
       };
 }
 

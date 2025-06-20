@@ -4,8 +4,11 @@ import 'package:wisetrack_app/ui/MenuPage/moviles/SecurityActionsScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/login/VerificationCodeScreen.dart';
 
+import '../../../data/models/vehicles/Vehicle.dart';
+
 class VehicleDetailScreen extends StatelessWidget {
-  const VehicleDetailScreen({Key? key}) : super(key: key);
+  const VehicleDetailScreen({Key? key, required Vehicle vehicle})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {

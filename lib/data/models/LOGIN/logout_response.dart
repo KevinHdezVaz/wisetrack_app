@@ -1,16 +1,13 @@
 class LogoutResponse {
-  final bool success;
-  final String? message;
+  final String detail;
 
   LogoutResponse({
-    required this.success,
-    this.message,
+    required this.detail,
   });
 
   factory LogoutResponse.fromJson(Map<String, dynamic> json) {
     return LogoutResponse(
-      success: json['success'] ?? false,
-      message: json['message'],
+      detail: json['detail'],
     );
   }
 }

@@ -20,7 +20,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final Completer<GoogleMapController> _mapController = Completer();
   final Set<Marker> _markers = {};
 
-  // Posición inicial del mapa, centrada en la zona de las imágenes.
+  Position? _lastKnownPosition;
+  // Distancia mínima (en metros) para considerar un cambio de ubicación.
+  static const double _locationChangeThreshold = 50.0;
+
   static const CameraPosition _initialPosition = CameraPosition(
     target: LatLng(
         -32.775, -71.229), // Coordenadas aproximadas de La Calera/La Ligua
@@ -39,7 +42,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _requestLocationPermissionAndAnimate() async {
-    // 1. Verificar y solicitar el permiso de ubicación
     var status = await Permission.location.status;
     if (status.isDenied) {
       status = await Permission.location.request();
@@ -47,86 +49,121 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (status.isGranted) {
       try {
-        // 2. Obtener la posición actual
-        Position position = await Geolocator.getCurrentPosition(
+        Position newPosition = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
         );
 
-        final GoogleMapController controller = await _mapController.future;
+        // --- INICIO DE LA LÓGICA DE CACHÉ ---
 
-        // 3. Animar la cámara a la nueva posición
-        await controller.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: LatLng(position.latitude, position.longitude),
-              zoom: 15.0, // Un zoom más cercano para ver la ubicación actual
-            ),
-          ),
-        );
+        bool hasMovedSignificantly = true; // Asumimos que sí por defecto.
 
-        // 4. Opcional: Agregar un marcador en la ubicación del usuario
-        setState(() {
-          _markers.add(
-            Marker(
-              markerId: const MarkerId('user_location'),
-              position: LatLng(position.latitude, position.longitude),
-              infoWindow: const InfoWindow(title: 'Tu ubicación'),
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueBlue),
+        if (_lastKnownPosition != null) {
+          // Calcula la distancia entre la nueva posición y la última guardada.
+          final distanceInMeters = Geolocator.distanceBetween(
+            _lastKnownPosition!.latitude,
+            _lastKnownPosition!.longitude,
+            newPosition.latitude,
+            newPosition.longitude,
+          );
+
+          print(
+              "Distancia desde la última posición: ${distanceInMeters.toStringAsFixed(2)} metros.");
+
+          // Si la distancia es menor que nuestro umbral, no hacemos nada.
+          if (distanceInMeters < _locationChangeThreshold) {
+            hasMovedSignificantly = false;
+            print(
+                "El usuario no se ha movido lo suficiente. No se animará el mapa.");
+          }
+        }
+
+        // Solo animamos la cámara si es la primera vez o si se ha movido lo suficiente.
+        if (hasMovedSignificantly) {
+          print("Actualizando la vista del mapa a la nueva ubicación.");
+
+          final GoogleMapController controller = await _mapController.future;
+          await controller.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(
+                target: LatLng(newPosition.latitude, newPosition.longitude),
+                zoom: 15.0,
+              ),
             ),
           );
-        });
+
+          // Actualizamos la última posición conocida.
+          setState(() {
+            _lastKnownPosition = newPosition;
+          });
+        }
+        // --- FIN DE LA LÓGICA DE CACHÉ ---
+
+        // El marcador de ubicación del usuario se actualiza siempre.
+        _updateUserLocationMarker(newPosition);
       } catch (e) {
-        // Manejar posibles errores (ej. el GPS está desactivado)
         print("Error al obtener la ubicación: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'No se pudo obtener la ubicación. Asegúrate de que tu GPS esté activado.'),
+            ),
+          );
+        }
+      }
+    } else {
+      print("Permiso de ubicación denegado.");
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'No se pudo obtener la ubicación. Asegúrate de que tu GPS esté activado.',
-            ),
+                'El permiso de ubicación es necesario para usar esta función.'),
           ),
         );
       }
-    } else {
-      // El usuario denegó el permiso.
-      print("Permiso de ubicación denegado.");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'El permiso de ubicación es necesario para usar esta función.',
-          ),
-        ),
-      );
     }
   }
 
+  /// Actualiza o añade el marcador de la ubicación actual del usuario.
+  void _updateUserLocationMarker(Position position) {
+    setState(() {
+      // Primero, removemos el marcador anterior si existe.
+      _markers
+          .removeWhere((m) => m.markerId == const MarkerId('user_location'));
+      // Luego, añadimos el nuevo.
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('user_location'),
+          position: LatLng(position.latitude, position.longitude),
+          infoWindow: const InfoWindow(title: 'Tu ubicación'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+        ),
+      );
+    });
+  }
+
   /// Simula la carga de marcadores en el mapa.
-  /// En una app real, estos datos vendrían de una API.
   void _setMarkers() {
     setState(() {
-      _markers.add(
+      _markers.addAll([
         Marker(
           markerId: const MarkerId('movil_en_ruta_1'),
           position:
               const LatLng(-32.449, -71.241), // Ubicación cerca de La Ligua
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
         ),
-      );
-      _markers.add(
         Marker(
           markerId: const MarkerId('movil_en_ruta_2'),
           position: const LatLng(-32.683, -71.433), // Ubicación cerca de Papudo
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
         ),
-      );
-      _markers.add(
         Marker(
           markerId: const MarkerId('alerta_detenido'),
           position:
               const LatLng(-32.84, -71.45), // Ubicación cerca de Puchuncaví
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         ),
-      );
+      ]);
     });
   }
 
@@ -238,13 +275,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     // --- INICIO DE LA MODIFICACIÓN ---
                     suffixIcon: GestureDetector(
                       onTap: () {
+                        /*
                         showModalBottomSheet(
                           context: context,
                           isScrollControlled: true,
                           builder: (BuildContext context) {
                             return const FilterBottomSheet();
                           },
-                        );
+                        );*/
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12.0),

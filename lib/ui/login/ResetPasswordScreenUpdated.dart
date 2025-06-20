@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-// Asegúrate de que esta importación sea correcta para tu proyecto
+import 'package:wisetrack_app/data/services/auth_api_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
+import 'dart:convert'; // Para base64Encode si es necesario
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart'; // Importa el nuevo widget
 
 class ResetPasswordScreenUpdated extends StatefulWidget {
-  const ResetPasswordScreenUpdated({Key? key}) : super(key: key);
+  final String email; // Corrección del constructor
+  const ResetPasswordScreenUpdated({Key? key, required this.email})
+      : super(key: key);
 
   @override
   _ResetPasswordScreenUpdatedState createState() =>
@@ -19,6 +23,8 @@ class _ResetPasswordScreenUpdatedState
 
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+  bool _isLoading = false; // Estado para el indicador de carga
+  String? _errorMessage; // Estado para mensajes de error
 
   bool _hasMinLength = true;
   bool _hasMixedCase = true;
@@ -95,12 +101,54 @@ class _ResetPasswordScreenUpdatedState
   }
 
   bool get _isButtonEnabled {
+    // Habilitar el botón si la fuerza es al menos "acceptable" y las contraseñas coinciden
     return _userHasTyped &&
-        _hasMinLength &&
-        _hasMixedCase &&
-        _hasNumber &&
-        _hasSpecialChar &&
-        _passwordsMatch;
+        _passwordsMatch &&
+        (_strength == PasswordStrength.acceptable ||
+            _strength == PasswordStrength.secure) &&
+        !_isLoading;
+  }
+
+  Future<void> _resetPassword() async {
+    if (!_isButtonEnabled) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await AuthService.setNewPassword(
+        email: widget.email,
+        newPass: base64Encode(
+            utf8.encode(_passwordController.text)), // Codificación Base64
+        newPassCheck:
+            base64Encode(utf8.encode(_confirmPasswordController.text)),
+      );
+
+      if (response.success) {
+        // Éxito: Navegar a la pantalla de verificación o login
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text(response.message ?? 'Contraseña cambiada con éxito')),
+        );
+        Navigator.pushReplacementNamed(
+            context, '/login'); // Ajusta la ruta según tu app
+      } else {
+        setState(() {
+          _errorMessage = response.message ?? 'Error al cambiar la contraseña';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error de conexión: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -122,6 +170,15 @@ class _ResetPasswordScreenUpdatedState
                   _buildValidationChecks(),
                   const SizedBox(height: 24),
                   _buildForm(),
+                  if (_errorMessage != null) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   _buildStrengthIndicator(),
                   const SizedBox(height: 40),
@@ -132,11 +189,17 @@ class _ResetPasswordScreenUpdatedState
             ),
           ),
           Positioned(
-            // ← Botón después, encima de todo
             top: 40.0,
             left: 16.0,
             child: _buildBackButton(context),
           ),
+          if (_isLoading)
+            Center(
+              child: AnimatedTruckProgress(
+                progress: 1.0, // Progreso completo para simular carga
+                duration: const Duration(milliseconds: 400),
+              ),
+            ), // Indicador de carga como overlay
         ],
       ),
     );
@@ -149,7 +212,6 @@ class _ResetPasswordScreenUpdatedState
           if (Navigator.of(context).canPop()) {
             Navigator.of(context).pop();
           } else {
-            // Opcional: navegar a una ruta específica si no hay stack
             Navigator.pushReplacementNamed(context, '/login');
           }
         } catch (e) {
@@ -164,7 +226,6 @@ class _ResetPasswordScreenUpdatedState
     );
   }
 
-  // --- INICIO DE LA MODIFICACIÓN ---
   Widget _buildStrengthIndicator() {
     if (_strength == PasswordStrength.none) return const SizedBox.shrink();
 
@@ -195,10 +256,8 @@ class _ResetPasswordScreenUpdatedState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // La imagen que ya tenías
         Image.asset(imagePath),
         const SizedBox(height: 8),
-        // El texto descriptivo que faltaba
         Align(
           alignment: Alignment.center,
           child: Padding(
@@ -212,7 +271,6 @@ class _ResetPasswordScreenUpdatedState
       ],
     );
   }
-  // --- FIN DE LA MODIFICACIÓN ---
 
   Widget _buildBackground(BuildContext context) {
     return Stack(
@@ -242,7 +300,7 @@ class _ResetPasswordScreenUpdatedState
               fontSize: 32,
               fontWeight: FontWeight.bold,
               color: Colors.black,
-              height: 1.0, // Elimina espacio adicional
+              height: 1.0,
             ),
           ),
           Text(
@@ -321,10 +379,8 @@ class _ResetPasswordScreenUpdatedState
           controller: controller,
           obscureText: !isVisible,
           style: TextStyle(
-            // Estilo para aumentar el tamaño de los asteriscos
-            fontSize: 16, // Tamaño aumentado (valor original suele ser 16)
-            letterSpacing:
-                1.5, // Espaciado entre caracteres para mejor legibilidad
+            fontSize: 16,
+            letterSpacing: 1.5,
           ),
           decoration: InputDecoration(
             hintText: 'Ingresa tu clave de acceso',
@@ -339,15 +395,13 @@ class _ResetPasswordScreenUpdatedState
             suffixIcon: IconButton(
               icon: Icon(
                 isVisible ? Icons.visibility_off : Icons.visibility,
-                color: Colors.black, // Color negro para el icono
-                size: 24, // Tamaño opcionalmente aumentado
+                color: Colors.black,
+                size: 24,
               ),
               onPressed: onToggleVisibility,
             ),
-            contentPadding: const EdgeInsets.symmetric(
-                // Ajuste de padding interno
-                vertical: 16,
-                horizontal: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
           ),
         ),
       ],
@@ -358,16 +412,12 @@ class _ResetPasswordScreenUpdatedState
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: _isButtonEnabled
-            ? () {/* TODO: Lógica para cambiar contraseña */}
-            : null,
+        onPressed: _isButtonEnabled ? _resetPassword : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           disabledBackgroundColor: AppColors.disabled,
-          padding:
-              const EdgeInsets.symmetric(vertical: 10), // Reducido de 16 a 10
-          minimumSize:
-              const Size(0, 42), // Altura mínima reducida (default es 48)
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          minimumSize: const Size(0, 42),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.0),
           ),

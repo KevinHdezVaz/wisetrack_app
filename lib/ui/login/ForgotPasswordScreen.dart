@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:wisetrack_app/data/services/auth_api_service.dart';
+import 'dart:async';
+import 'dart:math';
+
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/login/VerificationCodeScreen.dart';
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({Key? key}) : super(key: key);
@@ -9,19 +14,28 @@ class ForgotPasswordScreen extends StatefulWidget {
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
+    with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
   bool _isButtonEnabled = false;
+  bool _isLoading = false;
+  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
     _emailController.addListener(_updateButtonState);
+    _animationController =
+        AnimationController(vsync: this, duration: const Duration(seconds: 2))
+          ..addListener(() {
+            setState(() {});
+          });
   }
 
   @override
   void dispose() {
     _emailController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -31,15 +45,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
   }
 
+  bool _isValidEmail(String email) {
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    return emailRegex.hasMatch(email);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Capa 1: Elementos decorativos de fondo
           _buildBackground(context),
-
           SafeArea(
             child: SingleChildScrollView(
               child: Padding(
@@ -69,76 +86,82 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Widget _buildBackButton(BuildContext context) {
-    return IconButton(
-      padding: EdgeInsets.zero,
-      icon: Image.asset(
+    return GestureDetector(
+      onTap: () {
+        try {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          } else {
+            Navigator.pushReplacementNamed(context, '/login');
+          }
+        } catch (e) {
+          print('Error al navegar: $e');
+        }
+      },
+      child: Image.asset(
         'assets/images/backbtn.png',
         width: 50,
         height: 50,
       ),
-      onPressed: () => Navigator.of(context).pop(),
     );
   }
 
   Widget _buildBackground(BuildContext context) {
+    // Usando contenedores en lugar de imágenes para que sea autoejecutable
     return Stack(
       children: [
         Positioned(
-          top: 0,
-          left: 0,
-          child: Image.asset(
-            'assets/images/rectangleForgot.png',
-            width: MediaQuery.of(context).size.width * 0.7,
-            fit: BoxFit.contain,
-          ),
-        ),
+            top: 0,
+            left: 0,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.7,
+              height: 200,
+              decoration: const BoxDecoration(
+                  color: Color(0x11009688),
+                  borderRadius:
+                      BorderRadius.only(bottomRight: Radius.circular(200))),
+            )),
         Positioned(
-          bottom: 50,
-          right: 0,
-          child: Image.asset(
-            'assets/images/rectangle2Forgot.png',
-            width: MediaQuery.of(context).size.width * 0.8,
-            fit: BoxFit.contain,
-          ),
-        ),
+            bottom: 50,
+            right: 0,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.8,
+              height: 200,
+              decoration: const BoxDecoration(
+                  color: Color(0x11009688),
+                  borderRadius:
+                      BorderRadius.only(topLeft: Radius.circular(250))),
+            )),
       ],
     );
   }
 
-  /// Widget que construye el encabezado de la pantalla.
   Widget _buildHeader() {
     return Column(
-      children: [
-        const Text(
+      children: const [
+        Text(
           'Recupera tu cuenta',
           style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textDark,
-          ),
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textDark),
         ),
-        const SizedBox(height: 16),
-        const Text(
+        SizedBox(height: 16),
+        Text(
           'Envía tu correo electrónico para recibir el enlace de restablecimiento',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.black,
-          ),
+          style: TextStyle(fontSize: 16, color: Colors.black),
         ),
       ],
     );
   }
 
-  /// Widget que construye el formulario.
   Widget _buildForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Correo electrónico',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
+        const Text('Correo electrónico',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 8),
         TextFormField(
           controller: _emailController,
@@ -166,38 +189,97 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  /// Widget que construye el botón de envío.
   Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: _isButtonEnabled
-            ? () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => OtpVerificationScreen(),
-                  ),
+        onPressed: _isButtonEnabled && !_isLoading
+            ? () async {
+                final email = _emailController.text.trim();
+                if (!_isValidEmail(email)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Por favor, ingrese un correo válido')),
+                  );
+                  return;
+                }
+
+                setState(() {
+                  _isLoading = true;
+                });
+
+                _animationController.forward();
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (dialogContext) {
+                    return Center(
+                      child: AnimatedTruckProgress(
+                        progress: _animationController.value,
+                      ),
+                    );
+                  },
                 );
+
+                try {
+                  final response =
+                      await AuthService.requestPasswordReset(email);
+
+                  await _animationController.animateTo(1.0);
+                  if (!mounted) return;
+                  Navigator.of(context).pop();
+
+                  if (response.success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text(response.message ?? 'Código enviado')),
+                    );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              OtpVerificationScreen(email: email)),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text(
+                              response.message ?? 'Error al enviar el código')),
+                    );
+                  }
+                } catch (e) {
+                  if (!mounted) return;
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                } finally {
+                  if (mounted) {
+                    setState(() {
+                      _isLoading = false;
+                      _animationController.reset();
+                    });
+                  }
+                }
               }
             : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              _isButtonEnabled ? AppColors.primary : AppColors.disabled,
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.0),
-          ),
+          backgroundColor: _isButtonEnabled && !_isLoading
+              ? AppColors.primary
+              : AppColors.disabled,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
           elevation: 0,
         ),
+        // --- INICIO DE LA MODIFICACIÓN ---
+        // Se reemplazó AnimatedTruckProgress por CircularProgressIndicator
         child: const Text(
           'Siguiente',
           style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+              fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
         ),
+        // --- FIN DE LA MODIFICACIÓN ---
       ),
     );
   }

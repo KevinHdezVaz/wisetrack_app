@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:wisetrack_app/data/services/UserService.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
+import 'package:wisetrack_app/data/models/User/UserDetail.dart'; // Importa UserDetail
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
@@ -14,18 +16,54 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _emailController;
   late TextEditingController _companyController;
 
+  bool _isLoading = true; // Estado para mostrar el indicador de carga
+  String? _errorMessage; // Para manejar errores
+  UserDetail? _userDetail; // Para almacenar los datos del usuario
+
   @override
   void initState() {
     super.initState();
-    // Inicializamos los controladores con los datos del perfil
-    _nameController = TextEditingController(text: 'Francisca Sepúlveda');
-    _emailController = TextEditingController(text: 'fsepulveda@addyra.com');
-    _companyController = TextEditingController(text: 'Addyra Consultoría');
+    // Inicializamos los controladores con valores vacíos
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
+    _companyController = TextEditingController();
+
+    // Cargar datos del usuario
+    _loadUserData();
+  }
+
+  // Método para cargar los datos del usuario
+  Future<void> _loadUserData() async {
+    try {
+      final userDetail = await UserService.getUserDetail();
+      if (mounted) {
+        setState(() {
+          _userDetail = userDetail;
+          _nameController.text = userDetail.fullName ?? '';
+          _emailController.text = userDetail.username;
+          _companyController.text = userDetail.company?.toString() ?? '';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+        // Manejar sesión expirada
+        if (e.toString().contains('Session expired')) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.of(context).pushReplacementNamed('/login');
+          });
+        }
+      }
+    }
   }
 
   @override
   void dispose() {
-    // Es importante desechar los controladores para liberar memoria
+    // Desechar los controladores para liberar memoria
     _nameController.dispose();
     _emailController.dispose();
     _companyController.dispose();
@@ -47,28 +85,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       body: Stack(
         children: [
-          ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            children: [
-              const SizedBox(height: 20),
-              _buildProfilePicture(),
-              const SizedBox(height: 16),
-              const Center(
-                child: Text(
-                  '38 móviles asociados',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ),
-              const SizedBox(height: 30),
-              _buildTextField(label: 'Nombre', controller: _nameController),
-              const SizedBox(height: 20),
-              _buildTextField(
-                  label: 'Correo electrónico', controller: _emailController),
-              const SizedBox(height: 20),
-              _buildTextField(label: 'Empresa', controller: _companyController),
-              const SizedBox(height: 120), // Espacio para el botón
-            ],
-          ),
+          _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary))
+              : _errorMessage != null
+                  ? Center(child: Text(_errorMessage!))
+                  : ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      children: [
+                        const SizedBox(height: 20),
+                        _buildProfilePicture(),
+                        const SizedBox(height: 16),
+                        const Center(
+                          child: Text(
+                            '38 móviles asociados',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                        _buildTextField(
+                            label: 'Nombre', controller: _nameController),
+                        const SizedBox(height: 20),
+                        _buildTextField(
+                            label: 'Correo electrónico',
+                            controller: _emailController),
+                        const SizedBox(height: 20),
+                        _buildTextField(
+                            label: 'Empresa', controller: _companyController),
+                        const SizedBox(height: 120), // Espacio para el botón
+                      ],
+                    ),
           _buildSaveChangesButton(),
         ],
       ),
@@ -78,7 +125,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _buildBackButton(BuildContext context) {
     return IconButton(
       icon: Image.asset(
-        'assets/images/backbtn.png', // Reutilizando el botón de regreso
+        'assets/images/backbtn.png',
         width: 40,
         height: 40,
       ),
@@ -93,8 +140,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         children: [
           const CircleAvatar(
             radius: 50,
-            backgroundImage:
-                NetworkImage('https://i.pravatar.cc/150?img=1'), // Placeholder
+            backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=1'),
             backgroundColor: Color(0xFFE6E0F8),
           ),
           Positioned(
@@ -152,17 +198,63 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       alignment: Alignment.bottomCenter,
       child: Container(
         padding: const EdgeInsets.all(16.0),
-        color: Colors.white, // Fondo para que el contenido no se vea por debajo
+        color: Colors.white,
         width: double.infinity,
         child: ElevatedButton(
-          // Por defecto está desactivado como en la imagen
-          onPressed: null,
+          onPressed: _isLoading
+              ? null
+              : () async {
+                  // Mostrar CircularProgressIndicator en un diálogo
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (dialogContext) {
+                      return const Center(
+                        child:
+                            CircularProgressIndicator(color: AppColors.primary),
+                      );
+                    },
+                  );
+
+                  try {
+                    // TODO: Implementar lógica para actualizar el perfil
+                    // Por ejemplo, llamar a un método UserService.updateUserDetail
+                    print('Guardando cambios:');
+                    print('Nombre: ${_nameController.text}');
+                    print('Email: ${_emailController.text}');
+                    print('Empresa: ${_companyController.text}');
+
+                    // Simular una petición (reemplazar con el endpoint real)
+                    await Future.delayed(const Duration(seconds: 1));
+
+                    // Cerrar el diálogo
+                    Navigator.of(context).pop();
+
+                    // Mostrar mensaje de éxito (opcional)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Perfil actualizado correctamente')),
+                    );
+
+                    // Regresar a la pantalla anterior
+                    Navigator.of(context).pop();
+                  } catch (e) {
+                    // Cerrar el diálogo
+                    Navigator.of(context).pop();
+
+                    // Mostrar error
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error al guardar cambios: $e')),
+                    );
+                  }
+                },
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             disabledBackgroundColor: AppColors.disabled,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10.0)),
+              borderRadius: BorderRadius.circular(10.0),
+            ),
           ),
           child: const Text(
             'Guardar cambios',

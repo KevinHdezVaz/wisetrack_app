@@ -21,6 +21,34 @@ class VehicleResponse {
   }
 }
 
+class VehicleTypesResponse {
+  final List<VehicleType> data;
+
+  VehicleTypesResponse({required this.data});
+
+  factory VehicleTypesResponse.fromJson(Map<String, dynamic> json) {
+    var list = json['data'] as List<dynamic>? ?? [];
+    return VehicleTypesResponse(
+      data: list.map((item) => VehicleType.fromJson(item)).toList(),
+    );
+  }
+}
+
+class VehicleType {
+  final int id;
+  final String name;
+
+  VehicleType({required this.id, required this.name});
+
+  factory VehicleType.fromJson(Map<String, dynamic> json) {
+    return VehicleType(
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? 'Desconocido',
+    );
+  }
+}
+ 
+ 
 // Modelo para un solo vehículo
 class Vehicle {
   final String plate;

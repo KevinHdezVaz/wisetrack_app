@@ -1,139 +1,182 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:wisetrack_app/data/models/vehicles/VehicleDetail.dart';
+ import 'package:wisetrack_app/data/services/vehicles_service.dart';
+import 'package:wisetrack_app/ui/MenuPage/auditoria/AuditDetailsScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/EditMobileScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/SecurityActionsScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
-import 'package:wisetrack_app/ui/login/VerificationCodeScreen.dart';
+// 1. IMPORTAMOS EL WIDGET DE ANIMACIÓN
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
-import '../../../data/models/vehicles/Vehicle.dart';
+class VehicleDetailScreen extends StatefulWidget {
+  final String plate;
+  const VehicleDetailScreen({Key? key, required this.plate}) : super(key: key);
 
-class VehicleDetailScreen extends StatelessWidget {
-  const VehicleDetailScreen({Key? key, required Vehicle vehicle})
-      : super(key: key);
+  @override
+  State<VehicleDetailScreen> createState() => _VehicleDetailScreenState();
+}
+
+// 2. AÑADIMOS EL SingleTickerProviderStateMixin
+class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTickerProviderStateMixin {
+  late Future<VehicleDetail> _vehicleDetailFuture;
+  // 3. DECLARAMOS EL ANIMATION CONTROLLER
+  late AnimationController _animationController;
+
+  @override
+  void initState() {
+    super.initState();
+    // 4. INICIALIZAMOS EL ANIMATION CONTROLLER
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3), // Misma duración que en MobilesScreen
+    );
+    // La llamada al servicio se mantiene igual
+    _vehicleDetailFuture = VehicleService.getVehicleDetail(widget.plate);
+  }
+
+  // 5. HACEMOS DISPOSE DEL CONTROLLER PARA LIBERAR RECURSOS
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Custom AppBar
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-              child: Row(
-                children: [
-                  // Back button (alineado a la izquierda)
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Image.asset(
-                      'assets/images/backbtn.png',
-                      width: 40,
-                      height: 40,
-                    ),
-                  ),
-                  // Espacio flexible que empuja el título al centro
-                  Expanded(
-                    child: Center(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'AAAA - 12',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                          IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            icon: Image.asset(
-                              'assets/images/icons_editar.png',
-                              width: 25,
-                              height: 25,
-                              color: Colors.grey,
-                            ),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => EditMobileScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Espacio invisible para balancear el botón de retroceso
-                  const SizedBox(
-                      width: 40), // Mismo ancho que el botón de retroceso
-                ],
-              ),
-            ),
-            // Body content
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(16.0),
-                children: [
-                  _buildTopStatusCard(),
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Reportabilidad'),
-                  _buildDataRow('Último reporte', '2024-10-21  11:31:46'),
-                  const SizedBox(height: 12),
-                  _buildDataRow('Ubicación', 'Zona descarga - Aeropuerto Scl.'),
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Seguridad'),
-                  _buildDataRow('Alimentación', '12.74 V'),
-                  const SizedBox(height: 12),
-                  _buildDataRow('Corte de combustible', 'Sin datos'),
-                  const SizedBox(height: 40),
-                  _buildActionButtons(context),
-                ],
-              ),
-            ),
-          ],
+        child: FutureBuilder<VehicleDetail>(
+          future: _vehicleDetailFuture,
+          builder: (context, snapshot) {
+            // --- ESTADO DE CARGA MODIFICADO ---
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              // Iniciamos la animación en bucle
+              _animationController.repeat();
+              // Mostramos el loader animado en lugar del CircularProgressIndicator
+              return Center(
+                child: AnimatedTruckProgress(
+                  animation: _animationController,
+                ),
+              );
+            }
+
+            // Si ya no estamos cargando, detenemos la animación por si acaso
+            _animationController.stop();
+
+            // --- ESTADO DE ERROR ---
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Text('Error al cargar los detalles: ${snapshot.error}', textAlign: TextAlign.center),
+                )
+              );
+            }
+
+            // --- ESTADO DE ÉXITO ---
+            if (snapshot.hasData) {
+              final vehicleDetail = snapshot.data!;
+              return _buildContent(context, vehicleDetail);
+            }
+
+            // Estado por defecto
+            return const Center(child: Text('No hay datos disponibles.'));
+          },
         ),
       ),
     );
   }
 
-  Widget _buildBackButton(BuildContext context) {
-    return IconButton(
-      icon: Image.asset(
-        'assets/images/backbtn.png',
-        width: 40,
-        height: 40,
-      ),
-      onPressed: () => Navigator.of(context).pop(),
+  // El resto de la clase no necesita cambios
+  
+  Widget _buildContent(BuildContext context, VehicleDetail vehicle) {
+    return Column(
+      children: [
+        _buildCustomAppBar(context, vehicle),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
+              _buildTopStatusCard(vehicle),
+              const SizedBox(height: 24),
+              _buildSectionTitle('Reportabilidad'),
+              _buildDataRow('Último reporte', _formatDate(vehicle.lastReport)),
+              const SizedBox(height: 12),
+              _buildDataRow('Ubicación', vehicle.location.isNotEmpty ? vehicle.location : 'Sin datos'),
+              const SizedBox(height: 24),
+              _buildSectionTitle('Seguridad'),
+              _buildDataRow('Alimentación', vehicle.batteryVolt != null ? '${vehicle.batteryVolt} V' : 'Sin datos'),
+              const SizedBox(height: 12),
+              _buildDataRow('Corte de combustible', vehicle.fuelCutoff.isNotEmpty ? vehicle.fuelCutoff : 'Sin datos'),
+              const SizedBox(height: 40),
+              _buildActionButtons(context),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildTopStatusCard() {
+  Widget _buildCustomAppBar(BuildContext context, VehicleDetail vehicle) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Image.asset('assets/images/backbtn.png', width: 40, height: 40),
+          ),
+          Expanded(
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    vehicle.plate,
+                    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: Image.asset('assets/images/icons_editar.png', width: 25, height: 25, color: Colors.grey),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => EditMobileScreen()),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopStatusCard(VehicleDetail vehicle) {
     return Card(
-      color: Colors.white, // Fondo blanco
+      color: Colors.white,
       elevation: 2,
       shadowColor: Colors.black12,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15.0),
-        side: BorderSide(
-          color: Colors.grey, // Borde gris claro
-          width: 1.0, // Grosor del borde
-        ),
+        side: BorderSide(color: Colors.grey.shade300, width: 1.0),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 20.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildStatusItem(Icons.location_on, 'Posición', 'Válida'),
+            _buildStatusItem(Icons.location_on, 'Posición', vehicle.position),
             const SizedBox(height: 40, child: VerticalDivider()),
-            _buildStatusItem(Icons.gps_fixed, 'Conexión', 'Online'),
+            _buildStatusItem(Icons.gps_fixed, 'Conexión', vehicle.connection),
             const SizedBox(height: 40, child: VerticalDivider()),
-            _buildStatusItem(Icons.vpn_key, 'Estado', 'Encendido'),
+            _buildStatusItem(Icons.vpn_key, 'Estado', vehicle.status),
           ],
         ),
       ),
@@ -141,21 +184,20 @@ class VehicleDetailScreen extends StatelessWidget {
   }
 
   Widget _buildStatusItem(IconData icon, String title, String status) {
+    final bool isPositive = status.toLowerCase() == 'online' || status.toLowerCase() == 'encendido' || status.toLowerCase() == 'valida';
     return Column(
       children: [
         Icon(icon, color: AppColors.primaryIconos, size: 28),
         const SizedBox(height: 8),
         Row(
           children: [
-            Text(title,
-                style: TextStyle(
-                    color: Colors.black, fontWeight: FontWeight.bold)),
+            Text(title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
             const SizedBox(width: 4),
-            Icon(Icons.info_outline, color: Colors.grey, size: 14),
+            Icon(Icons.info_outline, color: Colors.grey.shade400, size: 14),
           ],
         ),
         const SizedBox(height: 4),
-        Text(status),
+        Text(status, style: TextStyle(color: isPositive ? Colors.green.shade700 : Colors.red.shade700, fontWeight: FontWeight.w500)),
       ],
     );
   }
@@ -166,25 +208,12 @@ class VehicleDetailScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: Container(
-              height: 1,
-              color: AppColors.primaryIconos, // Cyan line color
-            ),
-          ),
+          const Expanded(child: Divider(color: AppColors.primaryIconos, thickness: 1)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ),
-          Expanded(
-            child: Container(
-              height: 1,
-              color: AppColors.primaryIconos, // Cyan line color
-            ),
-          ),
+          const Expanded(child: Divider(color: AppColors.primaryIconos, thickness: 1)),
         ],
       ),
     );
@@ -196,16 +225,14 @@ class VehicleDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: Colors.grey),
+        border: Border.all(color: Colors.grey.shade400),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style:
-                  TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-          Text(
-            value,
+          Text(label, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          Flexible(
+            child: Text(value, textAlign: TextAlign.end),
           ),
         ],
       ),
@@ -219,19 +246,17 @@ class VehicleDetailScreen extends StatelessWidget {
           width: double.infinity,
           child: OutlinedButton(
             onPressed: () {
-              // TODO: Lógica para ir a Auditoría
+                Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => Auditdetailsscreen()),
+              );
             },
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               side: const BorderSide(color: AppColors.primary, width: 1.5),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
             ),
-            child: const Text('Auditoría',
-                style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16)),
+            child: const Text('Auditoría', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ),
         const SizedBox(height: 12),
@@ -241,26 +266,26 @@ class VehicleDetailScreen extends StatelessWidget {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => SecurityActionsScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => SecurityActionsScreen()),
               );
             },
             icon: const Icon(Icons.shield_outlined, color: Colors.white),
-            label: const Text('Acciones de Seguridad',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16)),
+            label: const Text('Acciones de Seguridad', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
             ),
           ),
         ),
       ],
     );
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) {
+      return 'Sin reporte';
+    }
+    return DateFormat('yyyy-MM-dd HH:mm:ss', 'es_ES').format(date);
   }
 }

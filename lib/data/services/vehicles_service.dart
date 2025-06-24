@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart'; // Import for debugPrint
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:wisetrack_app/data/models/vehicles/Vehicle.dart'; // Importa tus modelos de Vehicle
+import 'package:wisetrack_app/data/models/vehicles/VehicleDetail.dart';
+import 'package:wisetrack_app/data/models/vehicles/VehicleHistoryPoint.dart';
 import 'package:wisetrack_app/utils/TokenStorage.dart';
 import 'package:wisetrack_app/utils/constants.dart'; // Tu clase TokenStorage
 
@@ -48,31 +51,32 @@ class VehicleService {
   }
 
   // 2. GET VEHICLE DETAIL BY PLATE
-  static Future<Vehicle> getVehicleDetail(String plate) async {
+   static Future<VehicleDetail> getVehicleDetail(String plate) async {
     final url = Uri.parse('${Constants.baseUrl}/vehicle/get/$plate');
-    debugPrint(
-        'VehicleService: Realizando GET a: $url para placa: $plate'); // Log de la URL
+    debugPrint('VehicleService: Realizando GET a: $url para placa: $plate');
+    
     try {
       final response = await http.get(
         url,
         headers: await _getAuthHeaders(),
       );
 
-      debugPrint(
-          'VehicleService: Respuesta GET ${response.statusCode}: ${response.body}'); // Log de la respuesta
+      debugPrint('VehicleService: Respuesta GET ${response.statusCode}: ${response.body}');
 
       if (response.statusCode == 200) {
-        return Vehicle.fromJson(jsonDecode(response.body));
+        // Ahora es más simple, solo pasamos el JSON al nuevo modelo.
+        return VehicleDetail.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception(
-            'Failed to load vehicle details: ${response.statusCode} - ${response.body}');
+        throw Exception('Failed to load vehicle details: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      debugPrint(
-          'VehicleService: Error en getVehicleDetail para $plate: $e'); // Log del error
+      debugPrint('VehicleService: Error en getVehicleDetail para $plate: $e');
       throw Exception('Vehicle detail request failed: $e');
     }
   }
+
+ 
+
 
   // 3. GET ALL VEHICLES POSITIONS
   static Future<List<VehiclePosition>> getVehiclesPositions(
@@ -104,43 +108,50 @@ class VehicleService {
     }
   }
 
-  // 4. GET VEHICLE HISTORY
-  static Future<List<VehicleHistoryPoint>> getVehicleHistory({
+  // 4. GET VEHICLE HISTORY (CORREGIDO PARA USAR GET)
+  static Future<List<HistoryPoint>> getVehicleHistory({
     required String plate,
     required DateTime startDate,
     required DateTime endDate,
   }) async {
-    final formattedStart = startDate.toIso8601String();
-    final formattedEnd = endDate.toIso8601String();
+    final formattedStart = DateFormat("yyyy-MM-dd").format(startDate);
+    final formattedEnd = DateFormat("yyyy-MM-dd").format(endDate);
+    
+    // CAMBIO 1: Construimos la URL base sin los parámetros de consulta
+    final baseUrl = '${Constants.baseUrl}/vehicle/get-history/$formattedStart/$formattedEnd';
 
-    final url = Uri.parse(
-        '${Constants.baseUrl}/vehicle/get-history/$formattedStart/$formattedEnd');
-    final body = jsonEncode({'plate': plate});
-    debugPrint(
-        'VehicleService: Realizando POST a: $url con body: $body'); // Log de la URL y cuerpo
+    // CAMBIO 2: Creamos un objeto Uri y le añadimos los parámetros de consulta
+    // de forma segura. Esto se encarga de formatear la URL correctamente
+    // como: ...?plate=RDXH27
+    final url = Uri.parse(baseUrl).replace(
+      queryParameters: {'plate': plate},
+    );
+ 
+
+    debugPrint('VehicleService: Realizando GET a: $url');
+    
     try {
-      final response = await http.post(
+      // CAMBIO 4: La llamada ahora es http.get() y no tiene 'body'.
+      final response = await http.get(
         url,
         headers: await _getAuthHeaders(),
-        body: body,
       );
 
-      debugPrint(
-          'VehicleService: Respuesta POST ${response.statusCode}: ${response.body}'); // Log de la respuesta
+      debugPrint('VehicleService: Respuesta GET ${response.statusCode}: ${response.body}');
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((json) => VehicleHistoryPoint.fromJson(json)).toList();
+        // La lógica para procesar la respuesta es la misma.
+        final historyResponse = HistoryResponse.fromJson(jsonDecode(response.body));
+        return historyResponse.data;
       } else {
-        throw Exception(
-            'Failed to load history: ${response.statusCode} - ${response.body}');
+        throw Exception('Failed to load history: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      debugPrint(
-          'VehicleService: Error en getVehicleHistory: $e'); // Log del error
+      debugPrint('VehicleService: Error en getVehicleHistory: $e');
       throw Exception('History request failed: $e');
     }
   }
+
 
   // 5. SET VEHICLE TYPE
   static Future<bool> setVehicleType({
@@ -168,4 +179,31 @@ class VehicleService {
       throw Exception('Set type failed: $e');
     }
   }
+
+
+  static Future<List<VehicleType>> getVehicleTypes() async {
+  final url = Uri.parse('${Constants.baseUrl}/vehicle/get-types'); // Asumiendo que esta es la ruta
+  debugPrint('VehicleService: Realizando GET a: $url');
+  
+  try {
+    final response = await http.get(
+      url,
+      headers: await _getAuthHeaders(),
+    );
+
+    debugPrint('VehicleService: Respuesta GET ${response.statusCode}: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = jsonDecode(response.body);
+      final typesResponse = VehicleTypesResponse.fromJson(data);
+      return typesResponse.data;
+    } else {
+      throw Exception('Failed to load vehicle types: ${response.statusCode} - ${response.body}');
+    }
+  } catch (e) {
+    debugPrint('VehicleService: Error en getVehicleTypes: $e');
+    throw Exception('Vehicle types request failed: $e');
+  }
+
+}
 }

@@ -79,18 +79,13 @@ Future<void> _login() async {
       if (!mounted) return;
 
       if (loginResponse.token.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Inicio de sesión exitoso'),
-            duration: Duration(seconds: 3),
-          ),
-        );
+       
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => DashboardScreen()),
         );
       } else {
-        // Personalizar el mensaje de error
+   
         String errorMessage = 'Usuario, contraseña o empresa incorrectos';
         if (loginResponse.error != null) {
           try {

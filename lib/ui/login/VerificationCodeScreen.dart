@@ -37,7 +37,7 @@ void initState() {
   // 3. Inicializar el AnimationController (si lo tienes aquí, mantenlo)
   _animationController = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 4),
+    duration: const Duration(seconds: 3),
   );
 
   // Simplemente iniciamos el contador, ya que el código se solicitó en la pantalla anterior.
@@ -267,7 +267,7 @@ void initState() {
     );
   }
 
-  Widget _buildBackground(BuildContext context) {
+ Widget _buildBackground(BuildContext context) {
     // Asegúrate de tener estas imágenes en tus assets
     return Stack(
       children: [
@@ -281,7 +281,7 @@ void initState() {
           ),
         ),
         Positioned(
-          bottom: 50,
+          bottom: 0,
           right: 0,
           child: Image.asset(
             'assets/images/rectangle2Forgot.png',

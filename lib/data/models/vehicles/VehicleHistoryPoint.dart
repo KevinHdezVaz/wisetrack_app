@@ -1,5 +1,3 @@
-// lib/data/models/vehicles/HistoryModel.dart
-
 import 'dart:convert';
 
 /// Modelo para la respuesta completa de la API del historial.
@@ -18,7 +16,9 @@ class HistoryResponse {
     );
   }
 }
- 
+
+/// Modelo para un único punto en el historial de un vehículo.
+/// Representa todos los campos que devuelve el endpoint de historial.
 class HistoryPoint {
   final String plate;
   final DateTime? timestamp;
@@ -37,10 +37,6 @@ class HistoryPoint {
   final bool digitalSensor4;
   final bool digitalSensor5;
   final bool digitalSensor6;
-  final int? satellites;
-  final double? altitude;
-  final double? equipmentBatteryVolts;
-  final int? gsmSignalPercent;
   final int? odometer;
 
   HistoryPoint({
@@ -61,18 +57,14 @@ class HistoryPoint {
     required this.digitalSensor4,
     required this.digitalSensor5,
     required this.digitalSensor6,
-    this.satellites,
-    this.altitude,
-    this.equipmentBatteryVolts,
-    this.gsmSignalPercent,
     this.odometer,
   });
 
   factory HistoryPoint.fromJson(Map<String, dynamic> json) {
     // Helper para parsear números de forma segura (String -> double?)
     double? safeParseDouble(dynamic value) {
-      if (value is String) return double.tryParse(value);
       if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value);
       return null;
     }
 
@@ -82,20 +74,14 @@ class HistoryPoint {
           ? DateTime.tryParse(json['mopo_fechahora'])
           : null,
       
-      // La API devuelve lat y lon como String, los convertimos a double
       latitude: safeParseDouble(json['mopo_lat']) ?? 0.0,
       longitude: safeParseDouble(json['mopo_lon']) ?? 0.0,
-
       speed: (json['mopo_vel'] as num?)?.toDouble() ?? 0.0,
       direction: json['mopo_dir'] as int? ?? 0,
       status: json['mopo_estado'] as String? ?? '',
-
-      // Sensores análogos (pueden ser String o num)
       analogSensor1: safeParseDouble(json['mopo_sensora1']),
       analogSensor2: safeParseDouble(json['mopo_sensora2']),
       analogSensor3: safeParseDouble(json['mopo_sensora3']),
-
-      // Booleanos
       ignitionStatus: json['mopo_estado_ignicion'] as bool? ?? false,
       digitalSensor1: json['mopo_sensord1'] as bool? ?? false,
       digitalSensor2: json['mopo_sensord2'] as bool? ?? false,
@@ -103,13 +89,8 @@ class HistoryPoint {
       digitalSensor4: json['mopo_sensord4'] as bool? ?? false,
       digitalSensor5: json['mopo_sensord5'] as bool? ?? false,
       digitalSensor6: json['mopo_sensord6'] as bool? ?? false,
-
-      // Campos que pueden ser nulos
-      satellites: json['satelites'] as int?,
-      altitude: (json['altitud'] as num?)?.toDouble(),
-      equipmentBatteryVolts: (json['equipobateriavolt'] as num?)?.toDouble(),
-      gsmSignalPercent: json['gsmsenal'] as int?,
       odometer: json['odometro'] as int?,
+      // Puedes añadir aquí el resto de los campos 'null' si los necesitas
     );
   }
 }

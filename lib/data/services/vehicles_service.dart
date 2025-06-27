@@ -181,20 +181,23 @@ class VehicleService {
   }
 
 
-  static Future<List<VehicleType>> getVehicleTypes() async {
+static Future<List<VehicleType>> getVehicleTypes() async {
   final url = Uri.parse('${Constants.baseUrl}/vehicle/get-types'); // Asumiendo que esta es la ruta
   debugPrint('VehicleService: Realizando GET a: $url');
   
   try {
+    final headers = await _getAuthHeaders();
+    headers['Accept-Charset'] = 'utf-8'; // Agregar header para soporte UTF-8
+    
     final response = await http.get(
       url,
-      headers: await _getAuthHeaders(),
+      headers: headers,
     );
 
     debugPrint('VehicleService: Respuesta GET ${response.statusCode}: ${response.body}');
 
     if (response.statusCode == 200) {
-      final Map<String, dynamic> data = jsonDecode(response.body);
+      final Map<String, dynamic> data = jsonDecode(utf8.decode(response.bodyBytes)); // Decodificar como UTF-8
       final typesResponse = VehicleTypesResponse.fromJson(data);
       return typesResponse.data;
     } else {
@@ -204,6 +207,45 @@ class VehicleService {
     debugPrint('VehicleService: Error en getVehicleTypes: $e');
     throw Exception('Vehicle types request failed: $e');
   }
-
 }
+
+
+ 
+  /// 5. Obtiene el historial de un vehículo usando una fecha de fin y un rango.
+  /// Envía una petición GET con un BODY (comportamiento no estándar de la API).
+  static Future<List<HistoryPoint>> getVehicleHistoryByRange({
+    required String plate,
+    required DateTime endDate,
+    required int rangeInHours,
+  }) async {
+    final formattedEndDate = DateFormat('yyyy-MM-dd HH:mm').format(endDate);
+    final url = Uri.parse('${Constants.baseUrl}/vehicle/get-history/$formattedEndDate/$rangeInHours');
+
+    debugPrint('VehicleService: Realizando GET a: $url con body: {"plate": "$plate"}');
+    
+    try {
+      // Se construye la petición manualmente para poder enviar un GET con body.
+      final request = http.Request('GET', url)
+        ..headers.addAll(await _getAuthHeaders())
+        ..body = jsonEncode({'plate': plate});
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      debugPrint('VehicleService: Respuesta GET ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final String responseBody = utf8.decode(response.bodyBytes);
+        final historyResponse = HistoryResponse.fromJson(jsonDecode(responseBody));
+        return historyResponse.data;
+      } else {
+        throw Exception('Fallo al cargar historial por rango: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('VehicleService: Error en getVehicleHistoryByRange: $e');
+      throw Exception('La petición de historial por rango falló: $e');
+    }
+  }
+
+
 }

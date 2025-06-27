@@ -22,7 +22,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
   late Future<VehicleDetail> _vehicleDetailFuture;
   // 3. DECLARAMOS EL ANIMATION CONTROLLER
   late AnimationController _animationController;
-
+  
   @override
   void initState() {
     super.initState();
@@ -144,7 +144,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => EditMobileScreen()),
+                        MaterialPageRoute(builder: (context) => EditMobileScreen(plate: vehicle.plate ,)),
                       );
                     },
                   ),
@@ -248,7 +248,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
             onPressed: () {
                 Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => Auditdetailsscreen()),
+                MaterialPageRoute(builder: (context) => AuditDetailsScreen(plate: widget.plate, )),
               );
             },
             style: OutlinedButton.styleFrom(

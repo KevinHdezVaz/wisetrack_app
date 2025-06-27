@@ -1,71 +1,202 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:wisetrack_app/ui/MenuPage/auditoria/CustomDatePickerDialog.dart';
+ import 'package:wisetrack_app/data/models/vehicles/VehicleHistoryPoint.dart';
+import 'package:wisetrack_app/data/services/vehicles_service.dart';
+ import 'package:wisetrack_app/ui/MenuPage/auditoria/CustomDatePickerDialog.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
+import 'package:geolocator/geolocator.dart';
 
-class Auditdetailsscreen extends StatefulWidget {
-  const Auditdetailsscreen({Key? key}) : super(key: key);
+class AuditDetailsScreen extends StatefulWidget {
+  final String plate;
+
+  const AuditDetailsScreen({Key? key, required this.plate}) : super(key: key);
 
   @override
-  _AuditScreenState createState() => _AuditScreenState();
+  _AuditDetailsScreenState createState() => _AuditDetailsScreenState();
 }
 
-class _AuditScreenState extends State<Auditdetailsscreen> {
-  DateTime _selectedDate = DateTime(2025, 5, 12);
+class _AuditDetailsScreenState extends State<AuditDetailsScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  bool _isLoading = true;
+  String? _errorMessage;
+  DateTime _selectedDate = DateTime.now();
   final List<String> _timeRanges = ['24 horas', '12 horas', '8 horas'];
   String _selectedRange = '24 horas';
   bool _isRangeDropdownOpen = false;
 
-  static const CameraPosition _initialPosition = CameraPosition(
-    target: LatLng(-33.045, -71.619),
-    zoom: 13.0,
-  );
+  final Completer<GoogleMapController> _mapController = Completer();
   final Set<Polyline> _polylines = {};
   final Set<Marker> _markers = {};
+  List<HistoryPoint> _historyPoints = [];
+
+  String _distanceTraveled = "0 Km";
+  String _averageSpeed = "0 km/h";
+  String _maxSpeed = "0 km/h";
+  String _totalTime = "00:00:00";
 
   @override
   void initState() {
     super.initState();
-    _setMapRoute();
+    _animationController =
+        AnimationController(vsync: this, duration: const Duration(seconds: 5));
+    _fetchHistory();
   }
 
-  void _setMapRoute() {
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchHistory() async {
     setState(() {
-      _markers.add(
-        const Marker(
-          markerId: MarkerId('vehicle_location'),
-          position: LatLng(-33.045, -71.619),
-        ),
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    _animationController.repeat();
+
+    try {
+      final endDate = DateTime(_selectedDate.year, _selectedDate.month,
+          _selectedDate.day, 23, 59, 59);
+      int hoursToSubtract = int.parse(_selectedRange.split(' ')[0]);
+
+      final history = await VehicleService.getVehicleHistoryByRange(
+        plate: widget.plate,
+        endDate: endDate,
+        rangeInHours: hoursToSubtract,
       );
-      _polylines.add(
-        const Polyline(
-          polylineId: PolylineId('route1'),
-          points: [
-            LatLng(-33.04, -71.62),
-            LatLng(-33.042, -71.618),
-            LatLng(-33.045, -71.619),
-            LatLng(-33.047, -71.622),
-          ],
-          color: AppColors.primary,
-          width: 5,
+
+      if (mounted) {
+        _historyPoints = history;
+        if (_historyPoints.isNotEmpty) {
+          _updateMapWithHistory();
+          _calculateAndSetMetrics();
+        } else {
+          _polylines.clear();
+          _markers.clear();
+          _resetMetrics();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _errorMessage = "Error al cargar el historial.";
+        debugPrint("Error en fetchHistory: $e");
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _animationController.stop();
+        _animationController.reset();
+      }
+    }
+  }
+
+  void _updateMapWithHistory() async {
+    if (_historyPoints.isEmpty) return;
+
+    final points =
+        _historyPoints.map((p) => LatLng(p.latitude, p.longitude)).toList();
+
+    _polylines.clear();
+    _markers.clear();
+
+    _polylines.add(
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: points,
+        color: AppColors.primary,
+        width: 5,
+      ),
+    );
+
+    _markers.add(Marker(
+        markerId: const MarkerId('start'),
+        position: points.first,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen)));
+    _markers.add(Marker(
+        markerId: const MarkerId('end'),
+        position: points.last,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed)));
+
+    if (_mapController.isCompleted) {
+      final GoogleMapController controller = await _mapController.future;
+      controller.animateCamera(CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(
+              points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b),
+              points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b)),
+          northeast: LatLng(
+              points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b),
+              points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b)),
         ),
+        50.0,
+      ));
+    }
+    setState(() {});
+  }
+
+  void _calculateAndSetMetrics() {
+    if (_historyPoints.length < 2) {
+      _resetMetrics();
+      return;
+    }
+
+    double totalDistance = 0;
+    for (int i = 0; i < _historyPoints.length - 1; i++) {
+      totalDistance += Geolocator.distanceBetween(
+        _historyPoints[i].latitude,
+        _historyPoints[i].longitude,
+        _historyPoints[i + 1].latitude,
+        _historyPoints[i + 1].longitude,
       );
+    }
+    _distanceTraveled = "${(totalDistance / 1000).toStringAsFixed(1)} Km";
+
+    double maxSpeed = 0;
+    double totalSpeed = 0;
+    int speedPointsCount = 0;
+    for (var point in _historyPoints) {
+      if (point.speed > maxSpeed) maxSpeed = point.speed;
+      if (point.speed > 0) {
+        totalSpeed += point.speed;
+        speedPointsCount++;
+      }
+    }
+    _maxSpeed = "${maxSpeed.toStringAsFixed(0)} km/h";
+    _averageSpeed = speedPointsCount > 0
+        ? "${(totalSpeed / speedPointsCount).toStringAsFixed(0)} km/h"
+        : "0 km/h";
+
+    final duration =
+        _historyPoints.last.timestamp!.difference(_historyPoints.first.timestamp!);
+    _totalTime = duration.toString().split('.').first.padLeft(8, "0");
+
+    setState(() {});
+  }
+
+  void _resetMetrics() {
+    setState(() {
+      _distanceTraveled = "0 Km";
+      _averageSpeed = "0 km/h";
+      _maxSpeed = "0 km/h";
+      _totalTime = "00:00:00";
     });
   }
 
   Future<void> _showCustomDatePicker(BuildContext context) async {
     final DateTime? pickedDate = await showDialog<DateTime>(
       context: context,
-      builder: (BuildContext context) {
-        return DatePickerBottomSheet(initialDate: _selectedDate);
-      },
+      builder: (BuildContext context) =>
+          DatePickerBottomSheet(initialDate: _selectedDate),
     );
 
-    if (pickedDate != null) {
-      setState(() {
-        _selectedDate = pickedDate;
-      });
+    if (pickedDate != null && pickedDate != _selectedDate) {
+      setState(() => _selectedDate = pickedDate);
+      _fetchHistory();
     }
   }
 
@@ -75,19 +206,28 @@ class _AuditScreenState extends State<Auditdetailsscreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         leading: _buildBackButton(context),
-        title: const Text('AAAA - 12',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: Text(widget.plate,
+            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        centerTitle: true,
       ),
       body: Stack(
         children: [
           GoogleMap(
-            initialCameraPosition: _initialPosition,
+            initialCameraPosition:
+                const CameraPosition(target: LatLng(-33.045, -71.619), zoom: 13.0),
             polylines: _polylines,
             markers: _markers,
             zoomControlsEnabled: false,
+            onMapCreated: (controller) {
+              if (!_mapController.isCompleted) {
+                _mapController.complete(controller);
+              }
+            },
           ),
-          _buildContentSheet(),
-          _buildDownloadButton(),
+          if (!_isLoading) _buildContentSheet(),
+          if (_isLoading)
+            Positioned.fill(
+                child: AnimatedTruckProgress(animation: _animationController)),
         ],
       ),
     );
@@ -96,7 +236,7 @@ class _AuditScreenState extends State<Auditdetailsscreen> {
   Widget _buildContentSheet() {
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
-      minChildSize: 0.6,
+      minChildSize: 0.2,
       maxChildSize: 0.9,
       builder: (BuildContext context, ScrollController scrollController) {
         return Container(
@@ -107,20 +247,49 @@ class _AuditScreenState extends State<Auditdetailsscreen> {
           ),
           child: ListView(
             controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 32.0),
+            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
             children: [
               _buildDriverInfo(),
-              const SizedBox(height: 0),
-              const SizedBox(height: 16), // Reducimos el espacio
+              const SizedBox(height: 16),
+             
               _buildDatePicker(context),
-              const SizedBox(height: 12), // Reducimos el espacio
+              const SizedBox(height: 12),
               _buildRangeDropdown(),
-              const SizedBox(height: 20), // Espacio final
-              _buildMetricsRow(), // MOVIMOS LAS MÉTRICAS ARRIBA DEL DATE PICKER
+              const SizedBox(height: 20),
+                _buildMetricsRow(),
+              const SizedBox(height: 16),
+              if (_errorMessage != null)
+                Center(
+                    child: Text(_errorMessage!,
+                        style: const TextStyle(color: Colors.red))),
+              if (!_isLoading && _historyPoints.isEmpty && _errorMessage == null)
+                const Center(
+                    child: Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                      'No se encontraron recorridos para la fecha y rango seleccionados.'),
+                )),
+              _buildDownloadButton(),
             ],
           ),
         );
       },
+    );
+  }
+
+ 
+  Widget _buildMetricsRow() {
+    return SizedBox(
+      height: 90,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _buildMetricCard(_distanceTraveled, 'Distancia recorrida'),
+          _buildMetricCard(_averageSpeed, 'Velocidad promedio'),
+          _buildMetricCard(_maxSpeed, 'Velocidad máxima'),
+          _buildMetricCard(_totalTime, 'Tiempo total'),
+        ],
+      ),
     );
   }
 
@@ -200,10 +369,13 @@ class _AuditScreenState extends State<Auditdetailsscreen> {
                       ? AppColors.primary.withOpacity(0.1)
                       : Colors.transparent,
                   child: InkWell(
-                    onTap: () => setState(() {
-                      _selectedRange = range;
-                      _isRangeDropdownOpen = false;
-                    }),
+                    onTap: () {
+                      setState(() {
+                        _selectedRange = range;
+                        _isRangeDropdownOpen = false;
+                      });
+                      _fetchHistory();
+                    },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16.0, vertical: 12.0),
@@ -236,87 +408,48 @@ class _AuditScreenState extends State<Auditdetailsscreen> {
   Widget _buildDriverInfo() {
     return Row(
       children: [
-        // Avatar
         const CircleAvatar(
-          radius: 20,
-          backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=5'),
-        ),
+            radius: 20,
+            backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=5')),
         const SizedBox(width: 12),
-
-        // Texto "Conductor" alineado a la izquierda
         const Text('Conductor',
             style: TextStyle(color: Colors.grey, fontSize: 14)),
-
-        // Espacio flexible que empuja el nombre a la derecha
         const Spacer(),
-
-        // Nombre alineado a la derecha
         const Text('Antonio López',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
       ],
     );
   }
 
-  Widget _buildMetricsRow() {
-    return SizedBox(
-      height: 120, // Fixed height to contain the cards
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          _buildMetricCard('5 Km', 'Distancia recorrida'),
-          _buildMetricCard('120 km/h', 'Velocidad promedio'),
-          _buildMetricCard('240 km/h', 'Velocidad maxima'),
-          _buildMetricCard('24:00:00', 'Tiempo total'),
-        ],
-      ),
-    );
-  }
-
   Widget _buildMetricCard(String value, String label) {
     return SizedBox(
-      width: 160,
-      child: SizedBox(
-        height: 80, // Fixed height for the card (adjust as needed)
-        child: Card(
-          elevation: 0,
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
+      width: 130,
+      child: Card(
+        elevation: 0,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Colors.grey, width: 1),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment:
-                  MainAxisAlignment.center, // Center content vertically
-              children: [
-                Text(value,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 2),
-                Text(label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
+            side: const BorderSide(color: Colors.grey, width: 1)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(value,
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.black, fontSize: 12)),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildDownloadButton() {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Container(
-        color: Colors.white.withOpacity(0.8),
-        padding: const EdgeInsets.all(16.0),
-        margin: const EdgeInsets.only(
-            bottom: 20.0), // Agrega espacio en la parte inferior
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: () {/* TODO: Lógica de descarga */},

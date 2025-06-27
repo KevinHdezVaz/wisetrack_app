@@ -1,40 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:math';
 
-// Asegúrate de que las rutas a tus archivos sean correctas
 import 'package:wisetrack_app/data/models/BarChartDataModel.dart';
+import 'package:wisetrack_app/data/models/dashboard/DashboardDetailModel.dart';
+import 'package:wisetrack_app/data/services/DashboardService.dart';
 import 'package:wisetrack_app/ui/MenuPage/auditoria/CustomDatePickerDialog.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 
-class Datavisualizationdetail extends StatefulWidget {
-  const Datavisualizationdetail({Key? key}) : super(key: key);
+class DataVisualizationDetail extends StatefulWidget {
+  final String title;
+  final String dataType; // ej: "d_vehicles_type"
+
+  const DataVisualizationDetail({
+    Key? key,
+    required this.title,
+    required this.dataType,
+  }) : super(key: key);
 
   @override
-  _DatavisualizationdetailState createState() =>
-      _DatavisualizationdetailState();
+  _DataVisualizationDetailState createState() =>
+      _DataVisualizationDetailState();
 }
 
-// La lógica y las variables ahora están dentro de la clase de Estado
-class _DatavisualizationdetailState extends State<Datavisualizationdetail> {
-  // --- VARIABLES Y DATOS DE LA PANTALLA ---
-  static final List<BarChartDataModel> alertsData = [
-    BarChartDataModel(
-        label: 'Exceso de velocidad', value: 360, color: AppColors.primary),
-    BarChartDataModel(
-        label: 'Encendido de motor', value: 90, color: Colors.teal),
-    BarChartDataModel(
-        label: 'Zona peligrosa', value: 230, color: Colors.lightBlue),
-    BarChartDataModel(label: 'Extra 1', value: 100, color: Colors.deepOrange),
-    BarChartDataModel(label: 'Extra 2', value: 90, color: Colors.orange),
-    BarChartDataModel(
-        label: 'Extra 3', value: 80, color: Colors.deepOrange.shade200),
-    BarChartDataModel(label: 'Extra 4', value: 70, color: Colors.indigo),
-    BarChartDataModel(label: 'Extra 5', value: 60, color: Colors.grey),
-  ];
-  static const double maxValue = 400;
-  DateTime _selectedDate = DateTime(2025, 5, 12);
+class _DataVisualizationDetailState extends State<DataVisualizationDetail> {
+  // Estado para manejar la fecha y los datos
+  DateTime _selectedDate = DateTime.now();
+  Future<DashboardDetailData>? _detailDataFuture;
 
-  // --- INICIO DE LA MODIFICACIÓN ---
+  @override
+  void initState() {
+    super.initState();
+    // Llama al servicio para la carga inicial de datos
+    _fetchDetails();
+  }
+
+  /// Llama al servicio para obtener los datos de detalle y actualiza el Future.
+  void _fetchDetails() {
+    setState(() {
+      _detailDataFuture = DashboardService.getDashboardDetailData(
+        rangeInHours: 24, // o el rango que necesites
+        dataType: widget.dataType,
+        // Pasamos la fecha seleccionada al servicio (necesitarás ajustar el servicio si no lo hiciste)
+        // Por ahora, asumimos que el servicio usa la fecha actual si no se especifica.
+      );
+    });
+  }
+
   /// Muestra el BottomSheet del calendario y actualiza la fecha.
   Future<void> _showCustomDatePicker(BuildContext context) async {
     final DateTime? pickedDate = await showModalBottomSheet<DateTime>(
@@ -42,19 +54,18 @@ class _DatavisualizationdetailState extends State<Datavisualizationdetail> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
-        // Llamamos al widget del BottomSheet que creamos anteriormente
         return DatePickerBottomSheet(initialDate: _selectedDate);
       },
     );
 
-    // Si el usuario confirma una fecha, actualizamos el estado para redibujar la UI
-    if (pickedDate != null) {
+    if (pickedDate != null && pickedDate != _selectedDate) {
       setState(() {
         _selectedDate = pickedDate;
+        // Al cambiar la fecha, se vuelve a llamar al servicio para refrescar los datos.
+        _fetchDetails();
       });
     }
   }
-  // --- FIN DE LA MODIFICACIÓN ---
 
   @override
   Widget build(BuildContext context) {
@@ -63,47 +74,68 @@ class _DatavisualizationdetailState extends State<Datavisualizationdetail> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        scrolledUnderElevation: 0,
         leading: _buildBackButton(context),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Alertas',
-                style: TextStyle(
+            Text(widget.title, // Título dinámico
+                style: const TextStyle(
                     color: Colors.black, fontWeight: FontWeight.bold)),
-            Text('San Isidro - Lun 12 may.',
+            Text(DateFormat('EEE, d MMM', 'es_ES').format(_selectedDate), // Fecha dinámica
                 style: TextStyle(color: Colors.grey[600], fontSize: 14)),
           ],
         ),
-        actions: [
-          IconButton(
-              icon: const Icon(Icons.more_horiz, color: Colors.black54),
-              onPressed: () {/* TODO: Lógica para más opciones */})
-        ],
       ),
-      body: Stack(
-        children: [
-          ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _buildDatePicker(context),
-              const SizedBox(height: 16),
-              _buildChartCard(),
-              const SizedBox(height: 100),
-            ],
-          ),
-          _buildDownloadButton(),
-        ],
+      body: FutureBuilder<DashboardDetailData>(
+        future: _detailDataFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text("Error: ${snapshot.error}"));
+          }
+          if (snapshot.hasData) {
+            final detailData = snapshot.data!;
+            return _buildContent(detailData);
+          }
+          return const Center(child: Text("No hay datos disponibles."));
+        },
       ),
     );
   }
 
-  Widget _buildBackButton(BuildContext context) {
-    return IconButton(
-      icon: Image.asset('assets/images/backbtn.png', width: 40, height: 40),
-      onPressed: () => Navigator.of(context).pop(),
+  Widget _buildContent(DashboardDetailData detailData) {
+    // Mapeamos los datos del servicio al formato del gráfico
+    final chartData = detailData.breakdown.entries.map((entry) {
+      return BarChartDataModel(
+        label: entry.key.replaceAll('_', ' '),
+        value: entry.value.toDouble(),
+        color: Colors.primaries[entry.key.hashCode % Colors.primaries.length]
+      );
+    }).toList()..sort((a,b) => b.value.compareTo(a.value));
+    
+    final maxValue = detailData.breakdown.values.isEmpty 
+      ? 1.0 
+      : detailData.breakdown.values.reduce(max).toDouble() * 1.1;
+
+    return Stack(
+      children: [
+        ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildDatePicker(context),
+            const SizedBox(height: 16),
+            _buildChartCard(chartData, maxValue, detailData.total.toString()),
+            const SizedBox(height: 100),
+          ],
+        ),
+        _buildDownloadButton(),
+      ],
     );
   }
+
+
 
   Widget _buildDatePicker(BuildContext context) {
     return GestureDetector(
@@ -136,65 +168,60 @@ class _DatavisualizationdetailState extends State<Datavisualizationdetail> {
       ),
     );
   }
-
-  // --- El resto de los métodos no necesitan cambios ---
-
-  Widget _buildChartCard() {
+  
+  Widget _buildChartCard(List<BarChartDataModel> data, double maxValue, String totalValue) {
     return Card(
       color: Colors.white,
-      elevation: 0, // Elimina la sombra
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(0), // Sin bordes redondeados
-        side: BorderSide.none, // Elimina el borde
-      ),
-      margin: EdgeInsets.zero, // Elimina el margen exterior
+      elevation: 0,
+      shape: RoundedRectangleBorder(side: BorderSide.none),
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            _buildHorizontalBarChart(),
+            _buildHorizontalBarChart(data, maxValue),
             const SizedBox(height: 16),
             const Divider(),
-            _buildFooter(),
+            _buildFooter(totalValue),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHorizontalBarChart() {
+  Widget _buildHorizontalBarChart(List<BarChartDataModel> data, double maxValue) {
+    if (data.isEmpty) {
+      return const SizedBox(height: 100, child: Center(child: Text("No hay datos para este período.")));
+    }
     return Column(
       children: [
-        ...alertsData.map((item) => _buildBarRow(item)).toList(),
+        ...data.map((item) => _buildBarRow(item, maxValue)).toList(),
         const SizedBox(height: 8),
-        _buildXAxis(),
+        _buildXAxis(maxValue),
       ],
     );
   }
+  
 
-  Widget _buildBarRow(BarChartDataModel item) {
+  Widget _buildBackButton(BuildContext context) {
+    return IconButton(
+      icon: Image.asset('assets/images/backbtn.png', width: 40, height: 40),
+      onPressed: () => Navigator.of(context).pop(),
+    );
+  }
+
+  Widget _buildBarRow(BarChartDataModel item, double maxValue) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start, // Alinea elementos al inicio vertical
         children: [
           SizedBox(
-            width: 80, // Ancho fijo para las etiquetas
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.end, // Alinea texto a la derecha
-              children: [
-                Text(
-                  item.label,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(fontSize: 12, color: Colors.black),
-                  softWrap: true, // Permite múltiples líneas
-                ),
-                if (item.label ==
-                    'Exceso de velocidad') // Espacio adicional solo para este item
-                  const SizedBox(height: 8),
-              ],
+            width: 90,
+            child: Text(
+              item.label,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 12, color: Colors.black),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 10),
@@ -203,10 +230,6 @@ class _DatavisualizationdetailState extends State<Datavisualizationdetail> {
               children: [
                 Container(
                   height: 20,
-                  margin: item.label == 'Exceso de velocidad'
-                      ? const EdgeInsets.only(
-                          top: 8) // Ajuste de margen para alinear la barra
-                      : EdgeInsets.zero,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(4),
@@ -214,17 +237,10 @@ class _DatavisualizationdetailState extends State<Datavisualizationdetail> {
                 ),
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final barWidth =
-                        (item.value / maxValue) * constraints.maxWidth;
+                    final barWidth = maxValue > 0 ? (item.value / maxValue) * constraints.maxWidth : 0;
                     return Container(
                       height: 20,
-                      margin: item.label == 'Exceso de velocidad'
-                          ? const EdgeInsets.only(
-                              top: 8) // Ajuste de margen para alinear la barra
-                          : EdgeInsets.zero,
-                      width: barWidth > constraints.maxWidth
-                          ? constraints.maxWidth
-                          : barWidth,
+                      width: barWidth.clamp(0.0, constraints.maxWidth).toDouble(),
                       decoration: BoxDecoration(
                         color: item.color,
                         borderRadius: BorderRadius.circular(4),
@@ -240,41 +256,43 @@ class _DatavisualizationdetailState extends State<Datavisualizationdetail> {
     );
   }
 
-  Widget _buildXAxis() {
+  Widget _buildXAxis(double maxValue) {
     return Padding(
-      padding: const EdgeInsets.only(left: 120),
+      padding: const EdgeInsets.only(left: 100),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          int numberOfLabels = 9;
+          int numberOfLabels = 5;
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(numberOfLabels, (index) {
-              int labelValue =
-                  (maxValue / (numberOfLabels - 1) * index).round();
-              return Text(labelValue.toString(),
-                  style: const TextStyle(fontSize: 12, color: Colors.grey));
+              int labelValue = (maxValue / (numberOfLabels - 1) * index).round();
+              return Text(
+                labelValue.toString(),
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              );
             }),
           );
         },
       ),
     );
   }
-
-  Widget _buildFooter() {
+  
+  Widget _buildFooter(String totalValue) {
     return Padding(
       padding: const EdgeInsets.only(top: 8.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Text('Alertas totales:',
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          SizedBox(width: 8),
-          Text('1037',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        children: [
+          const Text('Total:', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(width: 8),
+          Text(totalValue, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ],
       ),
     );
   }
+
+ 
+ 
 
   Widget _buildDownloadButton() {
     return Align(

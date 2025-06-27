@@ -25,12 +25,9 @@ class MyHttpOverrides extends HttpOverrides {
 }
 
 void main() {
-  // --> 3. APLICA LA ANULACIÓN ANTES DE CORRER LA APP
-  //     Esto le dice a toda tu aplicación que use las reglas definidas en MyHttpOverrides.
+ 
   HttpOverrides.global = MyHttpOverrides();
-
-  // Se inicializa la localización para español.
-  // Esto soluciona los errores de formato de fecha en toda la aplicación.
+ 
   initializeDateFormatting('es_ES', null).then((_) {
     runApp(const MyApp());
   });
@@ -45,7 +42,12 @@ class MyApp extends StatelessWidget {
       title: 'WiseTrack App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.black),
+         textSelectionTheme: TextSelectionThemeData(
+      selectionColor: Colors.blue.withOpacity(0.3), 
+      selectionHandleColor: Colors.blue,  
+      cursorColor: Colors.blue, 
+    ),
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.grey[100],
       ),
@@ -59,7 +61,7 @@ class MyApp extends StatelessWidget {
         '/dashboard_combined': (context) => const CombinedDashboardScreen(),
         '/mobiles': (context) => MobilesScreen(),
         '/auditoria': (context) =>
-            Auditoriascreen(), // Asegúrate que el nombre de la clase sea correcto
+            AuditoriaScreen(),  
         '/notifications': (context) => const NotificationsScreen(),
         '/settings': (context) => const SettingsScreen(),
       },

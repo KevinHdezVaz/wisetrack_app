@@ -72,7 +72,7 @@ class AppDrawer extends StatelessWidget {
               context: context,
               icon: Icons.exit_to_app,
               title: 'Cerrar sesión',
-              iconColor: Colors.blueGrey,
+              iconColor: AppColors.ColorFooter,
               // 2. El onTap ahora simplemente llama al callback
               onTap: () {
                 // Primero cierra el drawer para que se vea la animación en la pantalla completa
@@ -113,7 +113,7 @@ class AppDrawer extends StatelessWidget {
     required String title,
     String? routeName,
     Widget? trailing,
-    Color iconColor = AppColors.primary,
+    Color iconColor = AppColors.ColorFooter,
     VoidCallback? onTap,
   }) {
     final String? currentRoute = ModalRoute.of(context)?.settings.name;
@@ -121,14 +121,14 @@ class AppDrawer extends StatelessWidget {
 
     return ListTile(
       selected: isSelected,
-      selectedTileColor: AppColors.primary.withOpacity(0.1),
-      leading: Icon(icon, color: isSelected ? AppColors.primary : iconColor, size: 28),
+      selectedTileColor: AppColors.ColorFooter.withOpacity(0.1),
+      leading: Icon(icon, color: isSelected ? AppColors.ColorFooter : iconColor, size: 28),
       title: Text(
         title,
         style: TextStyle(
           fontSize: 16,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-          color: isSelected ? AppColors.primary : Colors.black87,
+          color: isSelected ? AppColors.ColorFooter : Colors.black87,
         ),
       ),
       trailing: trailing,
@@ -178,7 +178,7 @@ class AppDrawer extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(
-        color: AppColors.primary,
+        color: AppColors.ColorFooter,
         fontSize: 14,
         fontWeight: FontWeight.w500,
       ),

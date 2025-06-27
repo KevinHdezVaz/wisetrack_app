@@ -1,78 +1,124 @@
 import 'package:flutter/material.dart';
-
+import 'dart:math';
 import 'package:wisetrack_app/data/models/BarChartDataModel.dart';
+import 'package:wisetrack_app/data/models/dashboard/DashboardData.dart';
+import 'package:wisetrack_app/data/services/DashboardService.dart';
 import 'package:wisetrack_app/ui/MenuPage/dashboard/DataVisualizationDetail.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 
-class DataVisualizationScreen extends StatelessWidget {
+class DataVisualizationScreen extends StatefulWidget {
   const DataVisualizationScreen({Key? key}) : super(key: key);
 
-  static const List<BarChartDataModel> mobilesData = [
-    BarChartDataModel(label: 'Cama baja', value: 32, color: Color(0xFF00636A)),
-    BarChartDataModel(label: 'Camión ¾', value: 8, color: Colors.teal),
-    BarChartDataModel(label: 'Rampla fría', value: 25, color: Colors.lightBlue),
-    BarChartDataModel(label: 'Rampla seca', value: 20, color: Colors.orange),
-  ];
+  @override
+  _DataVisualizationScreenState createState() =>
+      _DataVisualizationScreenState();
+}
 
-  static const List<BarChartDataModel> plannedData = [
-    BarChartDataModel(label: 'Extra 5', value: 50, color: Colors.grey),
-    BarChartDataModel(label: 'Extra 4', value: 75, color: Colors.indigo),
-    BarChartDataModel(label: 'Extra 3', value: 90, color: Colors.deepOrange),
-    BarChartDataModel(label: 'Extra 2', value: 110, color: Colors.orange),
-    BarChartDataModel(label: 'Extra 1', value: 220, color: Colors.lightBlue),
-    BarChartDataModel(
-        label: 'En Destino', value: 100, color: Color(0xFF00636A)),
-    BarChartDataModel(label: 'En Origen', value: 80, color: Color(0xFF00636A)),
-  ];
+class _DataVisualizationScreenState extends State<DataVisualizationScreen> {
+  late Future<DashboardData> _dashboardDataFuture;
 
-  static const List<BarChartDataModel> fleetStatusData = [
-    BarChartDataModel(
-        label: 'Sin transmisión', value: 1.5, color: Colors.orange),
-    BarChartDataModel(
-        label: 'Apagado > 1H', value: 2.1, color: Colors.deepOrange),
-    BarChartDataModel(label: 'Ralentí', value: 2.8, color: Colors.lightBlue),
-    BarChartDataModel(label: 'En ruta', value: 4.5, color: Color(0xFF00636A)),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Llama al servicio para obtener los datos consolidados.
+    _dashboardDataFuture = DashboardService.getDashboardData(rangeInHours: 24);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      // --- INICIO DE LA MODIFICACIÓN ---
-
-      body: ListView(
-        padding: const EdgeInsets.all(10),
-        children: [
-          ChartCard(
-              title: 'Móviles',
-              data: mobilesData,
-              totalLabel: 'Móviles totales',
-              totalValue: '78',
-              maxValue: 35),
-          const SizedBox(height: 16),
-          ChartCard(
-              title: 'Planificados',
-              data: plannedData,
-              totalLabel: 'Alertas totales',
-              totalValue: '1037',
-              maxValue: 400),
-          const SizedBox(height: 16),
-          ChartCard(
-              title: 'Estados Flota',
-              data: fleetStatusData,
-              totalLabel: 'Total en línea',
-              totalValue: '13',
-              maxValue: 5),
-        ],
+      body: FutureBuilder<DashboardData>(
+        future: _dashboardDataFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+                child: Text("Error al cargar los datos: ${snapshot.error}"));
+          }
+          if (snapshot.hasData) {
+            final data = snapshot.data!;
+            return _buildCharts(data);
+          }
+          return const Center(child: Text("No hay datos disponibles."));
+        },
       ),
     );
   }
 
-  Widget _buildBackButton(BuildContext context) {
-    return IconButton(
-      icon: Image.asset('assets/images/backbtn.png', width: 40, height: 40),
-      onPressed: () => Navigator.of(context).pop(),
+  /// Construye la lista de gráficos una vez que los datos de la API han llegado.
+  Widget _buildCharts(DashboardData data) {
+    final List<BarChartDataModel> mobilesData =
+        _mapToChartData(data.vehicleTypes, AppColors.primary);
+    final double maxMobileValue = _calculateMaxValue(data.vehicleTypes);
+
+    final List<BarChartDataModel> plannedData =
+        _mapToChartData(data.alertPlan, Colors.orange.shade600);
+    final double maxAlertValue = _calculateMaxValue(data.alertPlan);
+
+    final List<BarChartDataModel> fleetStatusData =
+        _mapToChartData(data.vehicleStatus, Colors.cyan.shade400);
+    final double maxStatusValue = _calculateMaxValue(data.vehicleStatus);
+
+    return ListView(
+      padding: const EdgeInsets.all(10),
+      children: [
+        ChartCard(
+          title: 'Móviles por Tipo',
+          data: mobilesData,
+          totalLabel: 'Móviles totales',
+          totalValue: data.totalVehicles.toString(),
+          maxValue: maxMobileValue,
+          dataType: 'd_vehicles_type', // Se pasa el dataType correcto
+        ),
+        const SizedBox(height: 16),
+        ChartCard(
+          title: 'Alertas del Plan (24h)',
+          data: plannedData,
+          totalLabel: 'Alertas totales',
+          totalValue: data.totalAlerts.toString(),
+          maxValue: maxAlertValue,
+          dataType: 'd_alert_plan', // Se pasa el dataType correcto
+        ),
+        const SizedBox(height: 16),
+        ChartCard(
+          title: 'Estado de la Flota',
+          data: fleetStatusData,
+          totalLabel: 'Total en línea',
+          totalValue: data.totalOnline.toString(),
+          maxValue: maxStatusValue,
+          dataType: 'd_vehicles_status', // Se pasa el dataType correcto
+        ),
+      ],
     );
+  }
+
+  List<BarChartDataModel> _mapToChartData(
+      Map<String, int> sourceMap, Color defaultColor) {
+    final sortedEntries = sourceMap.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return sortedEntries.map((entry) {
+      return BarChartDataModel(
+        label: entry.key.replaceAll('_', ' '),
+        value: entry.value.toDouble(),
+        color: _getColorForLabel(entry.key, defaultColor),
+      );
+    }).toList();
+  }
+
+  double _calculateMaxValue(Map<String, int> sourceMap) {
+    if (sourceMap.isEmpty || sourceMap.values.every((v) => v == 0)) return 1.0;
+    final maxValue = sourceMap.values.reduce(max).toDouble();
+    return maxValue * 1.1;
+  }
+
+  Color _getColorForLabel(String label, Color defaultColor) {
+    if (label == 'En ruta') return AppColors.primary;
+    if (label == 'Sin Transmision') return Colors.orange;
+    return defaultColor;
   }
 }
 
@@ -82,6 +128,7 @@ class ChartCard extends StatelessWidget {
   final String totalLabel;
   final String totalValue;
   final double maxValue;
+  final String dataType; // CORRECCIÓN: Se añade la propiedad que faltaba
 
   const ChartCard({
     Key? key,
@@ -90,6 +137,7 @@ class ChartCard extends StatelessWidget {
     required this.totalLabel,
     required this.totalValue,
     required this.maxValue,
+    required this.dataType, // CORRECCIÓN: Se añade al constructor
   }) : super(key: key);
 
   @override
@@ -99,20 +147,26 @@ class ChartCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => Datavisualizationdetail(),
+            builder: (context) => DataVisualizationDetail(
+              title: title,
+              dataType: dataType,
+            ),
           ),
         );
       },
       child: Card(
-        elevation: 12,
+        elevation: 10,
+                    color: Colors.white, // Fondo blanco explícito
+
         shadowColor: Colors.black,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15.0),
-          side: BorderSide(
-            color: Colors.grey, // Color del borde
-            width: 1.0, // Grosor del borde
-          ),
+     shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15.0),
+        // Añadimos el borde "medio negro" (un gris claro)
+        side: BorderSide(
+          color: Colors.grey.shade300,
+          width: 1.0,
         ),
+      ), 
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -143,8 +197,13 @@ class ChartCard extends StatelessWidget {
     );
   }
 
-  /// Construye el gráfico de barras horizontales manualmente
   Widget _buildHorizontalBarChart() {
+    if (data.isEmpty) {
+      return const SizedBox(
+        height: 100,
+        child: Center(child: Text("No hay datos para mostrar en el gráfico.")),
+      );
+    }
     return Column(
       children: [
         ...data.map((item) => _buildBarRow(item)).toList(),
@@ -170,11 +229,8 @@ class ChartCard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            // --- INICIO DE LA MODIFICACIÓN ---
-            // Usamos un Stack para poner el fondo detrás de la barra de progreso
             child: Stack(
               children: [
-                // 1. El contenedor de fondo (el "riel")
                 Container(
                   height: 20,
                   decoration: BoxDecoration(
@@ -182,16 +238,14 @@ class ChartCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                // 2. La barra de progreso (el valor)
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final barWidth =
-                        (item.value / maxValue) * constraints.maxWidth;
+                    final barWidth = maxValue > 0
+                        ? (item.value / maxValue) * constraints.maxWidth
+                        : 0;
                     return Container(
                       height: 20,
-                      width: barWidth > constraints.maxWidth
-                          ? constraints.maxWidth
-                          : barWidth,
+                      width: barWidth.clamp(0.0, constraints.maxWidth).toDouble(),
                       decoration: BoxDecoration(
                         color: item.color,
                         borderRadius: BorderRadius.circular(4),
@@ -201,7 +255,6 @@ class ChartCard extends StatelessWidget {
                 ),
               ],
             ),
-            // --- FIN DE LA MODIFICACIÓN ---
           ),
         ],
       ),
@@ -213,7 +266,9 @@ class ChartCard extends StatelessWidget {
       padding: const EdgeInsets.only(left: 100),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          int numberOfLabels = 8;
+          int numberOfLabels = 5;
+          if (constraints.maxWidth < 150) numberOfLabels = 3;
+          
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(numberOfLabels, (index) {
@@ -239,7 +294,7 @@ class ChartCard extends StatelessWidget {
           Text('$totalLabel: $totalValue',
               style: const TextStyle(fontWeight: FontWeight.bold)),
           InkWell(
-            onTap: () {/* TODO: Lógica para "Ver más" */},
+            onTap: () {},
             child: Row(
               children: [
                 Text('Ver más', style: TextStyle(color: AppColors.primary)),

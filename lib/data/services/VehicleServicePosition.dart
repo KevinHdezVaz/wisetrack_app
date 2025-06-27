@@ -44,41 +44,34 @@ class VehiclePositionService {
     }
   }
 
-  // --- NUEVO MÉTODO AÑADIDO ---
-  /// Obtiene las posiciones de los vehículos.
-  /// 
-  /// Si no se proporciona una `plate`, devuelve las posiciones de todos los vehículos.
-  /// Si se proporciona una `plate`, devuelve solo la posición de ese vehículo.
-  static Future<VehiclePositionResponse> getAllVehiclesPosition({String? plate}) async {
-    final url = Uri.parse('${Constants.baseUrl}/vehicle/get-vehicles-position');
+  
+ // CORREGIDO: Renombrado a getVehiclesPositions y se ajusta la URL
+static Future<VehiclePositionResponse> getVehiclesPositions({String? plate}) async {
+  // Construye la URL dinámicamente: si hay patente, la añade al final.
+  final url = Uri.parse(
+      '${Constants.baseUrl}/vehicle/get-vehicles-position${plate != null ? '/$plate' : ''}');
+
+  // Ya no se necesita un 'body' para una llamada GET
+  debugPrint('VehiclePositionService: Realizando GET a: $url');
+
+  try {
+    final response = await http.get(
+      url,
+      headers: await _getAuthHeaders(),
+    );
+
+    // Corregimos el log para que diga GET en lugar de POST
+    debugPrint('VehiclePositionService: Respuesta GET ${response.statusCode}: ${response.body}');
     
-    // Prepara el cuerpo de la solicitud solo si se proporciona una patente.
-    final body = (plate != null) ? jsonEncode({'plate': plate}) : null;
-
-    debugPrint('VehiclePositionService: Realizando POST a: $url');
-    if(body != null) {
-      debugPrint('VehiclePositionService: Body: $body');
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+      return VehiclePositionResponse.fromJson(data);
+    } else {
+      throw Exception('Failed to load vehicles positions: ${response.statusCode} - ${response.body}');
     }
-
-    try {
-      final response = await http.get(
-        url,
-        headers: await _getAuthHeaders(),
-       );
-
-      debugPrint('VehiclePositionService: Respuesta POST ${response.statusCode}: ${response.body}');
-      
-      if (response.statusCode == 200) {
-        // La respuesta siempre es un objeto que contiene una lista 'data',
-        // así que reutilizamos el mismo modelo VehiclePositionResponse.
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        return VehiclePositionResponse.fromJson(data);
-      } else {
-        throw Exception('Failed to load vehicles positions: ${response.statusCode} - ${response.body}');
-      }
-    } catch (e) {
-      debugPrint('VehiclePositionService: Error en getVehiclesPositions: $e');
-      throw Exception('Vehicles positions request failed: $e');
-    }
+  } catch (e) {
+    debugPrint('VehiclePositionService: Error en getVehiclesPositions: $e');
+    throw Exception('Vehicles positions request failed: $e');
   }
+}
 }

@@ -5,7 +5,8 @@ import 'package:wisetrack_app/data/services/auth_api_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/DashboardScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/login/ForgotPasswordScreen.dart';
-import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart'; // Importa el widget corregido
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
+import 'package:wisetrack_app/utils/encryption_utils.dart'; // Importa el widget corregido
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -66,9 +67,13 @@ Future<void> _login() async {
   _animationController.repeat();
 
   try {
+
+        final base64Password = EncryptionUtils.toBase64(_passwordController.text.trim());
+
+
     final loginResponse = await AuthService.login(
       username: _usernameController.text.trim(),
-      password: _passwordController.text.trim(),
+      password: base64Password,  
       company: _companyController.text.trim(),
     );
 
@@ -350,6 +355,11 @@ Future<void> _login() async {
               borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
+              focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide:
+                  const BorderSide(color: AppColors.primary, width: 1.5),
+            ),
           ),
         ),
       ],
@@ -379,6 +389,11 @@ Future<void> _login() async {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+              focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide:
+                  const BorderSide(color: AppColors.primary, width: 1.5),
             ),
             suffixIcon: IconButton(
               icon: Icon(

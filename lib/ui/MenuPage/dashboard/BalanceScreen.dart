@@ -1,108 +1,193 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
+import 'package:wisetrack_app/data/models/dashboard/DashboardData.dart';
+import 'package:wisetrack_app/data/services/DashboardService.dart';
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
-// Asegúrate de que la ruta a tus colores sea la correcta
-// import 'app_colors.dart';
-
-class BalanceScreen extends StatelessWidget {
+class BalanceScreen extends StatefulWidget {
   const BalanceScreen({Key? key}) : super(key: key);
+
+  @override
+  _BalanceScreenState createState() => _BalanceScreenState();
+}
+
+class _BalanceScreenState extends State<BalanceScreen> with SingleTickerProviderStateMixin {
+  late Future<DashboardData> _dashboardDataFuture;
+  late AnimationController _animationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _dashboardDataFuture = DashboardService.getDashboardData(rangeInHours: 24);
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          MetricCard(
-            title: 'Flota activa',
-            progressValue: 0.94,
-            progressText: '94%',
-            progressColor: Colors.teal.shade400,
-            legendItems: const [
-              LegendItem(
-                  text: 'Reportando (48 Hrs)',
-                  value: '50 Móviles',
-                  color: Colors.teal),
-              LegendItem(
-                  text: 'Sin reportar (48 Hrs)',
-                  value: '3 Móviles',
-                  color: Colors.teal),
-            ],
-          ),
-          const SizedBox(height: 16),
-          MetricCard(
-            title: 'Rendimiento promedio',
-            progressValue: 0.91,
-            progressText: '91%',
-            progressColor: Colors.cyan.shade400,
-            legendItems: const [
-              LegendItem(
-                  text: 'Óptimo cliente',
-                  value: '3,7 Km/L',
-                  color: Colors.cyan),
-              LegendItem(text: 'Actual', value: '3,4 Km/L', color: Colors.cyan),
-            ],
-          ),
-          const SizedBox(height: 16),
-          MetricCard(
-            title: 'Costo combustible',
-            progressValue: 1.0, // El círculo está completo
-            progressText: '3,7',
-            progressColor: Colors.orange.shade400,
-            legendItems: const [
-              LegendItem(
-                  text: 'Promedio',
-                  value: '3,4 Km/L',
-                  color: Colors.cyan), // Color diferente como en la imagen
-              LegendItem(
-                  text: 'Actual', value: '3,7 Km/L', color: Colors.orange),
-            ],
-          ),
-          const SizedBox(height: 16),
-          MetricCard(
-            title: 'Cumplimiento de viajes',
-            progressValue: 0.83,
-            progressText: '83%',
-            progressColor: Colors.orange.shade600,
-            legendItems: const [
-              LegendItem(text: 'Planificados', value: '85', color: Colors.cyan),
-              LegendItem(text: 'Realizados', value: '71', color: Colors.orange),
-            ],
-          ),
-          const SizedBox(height: 16),
-          MetricCard(
-            title: 'Tasa de consumo en ralentí',
-            progressValue: 0.028, // 2.8%
-            progressText: '2,8%',
-            progressColor: Colors.deepOrange.shade400,
-            legendItems: const [
-              LegendItem(
-                  text: 'Total (L) consumidos',
-                  value: '3600',
-                  color: Colors.cyan),
-              LegendItem(
-                  text: '(L) en ralentí', value: '102', color: Colors.orange),
-            ],
-          ),
-        ],
+      body: FutureBuilder<DashboardData>(
+        future: _dashboardDataFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            _animationController.repeat();
+            return Center(
+              child: AnimatedTruckProgress(
+                animation: _animationController,
+              ),
+            );
+          }
+
+          _animationController.stop();
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error al cargar datos: ${snapshot.error}'));
+          }
+          if (snapshot.hasData) {
+            final data = snapshot.data!;
+            return _buildContent(data);
+          }
+          return const Center(child: Text('No hay datos para mostrar.'));
+        },
       ),
     );
   }
 
-  Widget _buildBackButton(BuildContext context) {
-    return IconButton(
-      icon: Image.asset(
-        'assets/images/backbtn.png',
-        width: 40,
-        height: 40,
-      ),
-      onPressed: () => Navigator.of(context).pop(),
+  /// Construye el contenido principal de la pantalla con los datos de la API.
+  Widget _buildContent(DashboardData data) {
+    // --- Lógica para la tarjeta "Estado de la Flota" ---
+    final statusLegendItems = data.vehicleStatus.entries
+        .map((entry) => LegendItem(
+              text: entry.key.replaceAll('_', ' ').replaceAll(' > 1 hora', ''),
+              value: entry.value.toString(),
+              color: _getColorForStatus(entry.key),
+            ))
+        .toList();
+
+    // --- Lógica para la tarjeta "Tipos de Vehículo" ---
+    final typeLegendItems = data.vehicleTypes.entries
+        .where((entry) => entry.value > 0)
+        .map((entry) => LegendItem(
+              text: entry.key,
+              value: entry.value.toString(),
+              color: _getColorForVehicleType(entry.key),
+            ))
+        .toList();
+
+    // --- Lógica para la tarjeta "Alertas del Plan" ---
+    final alertLegendItems = data.alertPlan.entries
+        .map((entry) => LegendItem(
+              text: entry.key.replaceAll('_', ' '),
+              value: entry.value.toString(),
+              color: _getColorForAlert(entry.key),
+            ))
+        .toList();
+
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        // --- TARJETA 1: TOTALES GENERALES ---
+        MetricCard(
+          title: 'Resumen General',
+          progressValue: data.totalVehicles > 0 ? data.totalOnline / data.totalVehicles : 0.0,
+          progressText: '${data.totalOnline}',
+          progressColor: Colors.blue,
+          legendItems: [
+            LegendItem(
+                text: 'Vehículos Totales',
+                value: data.totalVehicles.toString(),
+                color: Colors.grey.shade400),
+            LegendItem(
+                text: 'Vehículos En línea',
+                value: data.totalOnline.toString(),
+                color: Colors.blue),
+            LegendItem(
+                text: 'Alertas Totales (24h)',
+                value: data.totalAlerts.toString(),
+                color: Colors.red.shade400),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // --- TARJETA 2: ESTADO DE LA FLOTA ---
+        MetricCard(
+          title: 'Estado de la Flota',
+          progressValue: 1.0,
+          progressText: '${data.totalVehicles}',
+          progressColor: Colors.blue.shade400,
+          legendItems: statusLegendItems,
+        ),
+        const SizedBox(height: 16),
+
+        // --- TARJETA 3: TIPOS DE VEHÍCULO ---
+        MetricCard(
+          title: 'Tipos de Vehículo',
+          progressValue: 1.0,
+          progressText: '${data.vehicleTypes.length}',
+          progressColor: Colors.green.shade400,
+          legendItems: typeLegendItems,
+        ),
+        const SizedBox(height: 16),
+
+        // --- TARJETA 4: ALERTAS DEL PLAN ---
+        MetricCard(
+          title: 'Alertas del Plan (24h)',
+          progressValue: 1.0,
+          progressText: '${data.totalAlerts}',
+          progressColor: Colors.orange.shade600,
+          legendItems: alertLegendItems,
+        ),
+      ],
     );
+  }
+
+  // --- Helpers para asignar colores dinámicamente ---
+  Color _getColorForStatus(String status) {
+    switch (status) {
+      case 'En ruta':
+        return Colors.blue.shade400;
+      case 'Sin Transmision':
+        return Colors.orange.shade400;
+      case 'Ralentí':
+        return Colors.yellow.shade700;
+      case 'Apagado_>_1_hora':
+        return Colors.grey.shade500;
+      default:
+        return Colors.black;
+    }
+  }
+
+  Color _getColorForVehicleType(String typeName) {
+    return Colors.primaries[typeName.hashCode % Colors.primaries.length];
+  }
+
+  Color _getColorForAlert(String alertType) {
+    switch (alertType) {
+      case 'Exceso_de_velocidad':
+        return Colors.red.shade400;
+      case 'Encendido_de_motor':
+        return Colors.purple.shade400;
+      case 'Zona_peligrosa':
+        return Colors.deepOrange.shade400;
+      case 'En_Destino':
+        return Colors.green.shade400;
+      case 'En_Ruta':
+        return Colors.lightBlue.shade400;
+      default:
+        return Colors.red.shade300;
+    }
   }
 }
 
-/// WIDGET REUTILIZABLE PARA LAS TARJETAS DE MÉTRICAS
+// --- WIDGETS REUTILIZABLES ---
 class MetricCard extends StatelessWidget {
   final String title;
   final double progressValue;
@@ -122,10 +207,18 @@ class MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 2,
-      shadowColor: Colors.black12,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
-      child: Padding(
+      elevation: 10,
+            color: Colors.white, // Fondo blanco explícito
+
+      shadowColor: Colors.black,
+shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15.0),
+        // Añadimos el borde "medio negro" (un gris claro)
+        side: BorderSide(
+          color: Colors.grey.shade300,
+          width: 1.0,
+        ),
+      ),      child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,9 +238,11 @@ class MetricCard extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: legendItems
-                        .map((item) => _buildLegendRow(item))
-                        .toList(),
+                    children: legendItems.isEmpty
+                        ? [const Text('No hay datos para esta categoría.')]
+                        : legendItems
+                            .map((item) => _buildLegendRow(item))
+                            .toList(),
                   ),
                 ),
               ],
@@ -182,9 +277,8 @@ class MetricCard extends StatelessWidget {
   }
 }
 
-/// WIDGET REUTILIZABLE PARA EL INDICADOR CIRCULAR
 class CircularMetricIndicator extends StatelessWidget {
-  final double value; // de 0.0 a 1.0
+  final double value;
   final String text;
   final Color color;
 
@@ -221,7 +315,6 @@ class CircularMetricIndicator extends StatelessWidget {
   }
 }
 
-/// CLASE AUXILIAR PARA LOS ITEMS DE LA LEYENDA
 class LegendItem {
   final String text;
   final String value;

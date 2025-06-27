@@ -3,8 +3,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart'; // Necesario para IconData
 
-// Modelo principal para la respuesta de la API que contiene una lista de vehículos
-class VehicleResponse {
+ class VehicleResponse {
   final List<Vehicle> data;
 
   VehicleResponse({required this.data});
@@ -49,7 +48,7 @@ class VehicleType {
 }
  
  
-// Modelo para un solo vehículo
+
 class Vehicle {
   final String plate;
   final int statusDevice; // 1 = activo (GPS), 0 = inactivo
@@ -82,7 +81,6 @@ class Vehicle {
   }
 }
 
-// Enumeración que representa los tipos de vehículos con nombres descriptivos
 enum VehicleTypeEnum {
   lightVehicle, // 1: Coche pequeño, Liviano (asumido del PDF y JSON)
   truck, // 2: Camión (asumido del JSON)
@@ -105,7 +103,6 @@ enum VehicleTypeEnum {
   unknown, // Fallback para tipos no reconocidos
 }
 
-// <--- CAMBIO CLAVE AQUÍ: toVehicleTypeEnum() sigue siendo una extensión en int ---
 extension VehicleTypeIntExtension on int {
   // Renombrado para mayor claridad
   VehicleTypeEnum toVehicleTypeEnum() {
@@ -140,8 +137,7 @@ extension VehicleTypeIntExtension on int {
   }
 }
 
-// <--- NUEVA EXTENSIÓN: imageAssetPath y defaultIconData son ahora métodos de VehicleTypeEnum ---
-extension VehicleTypeEnumExtension on VehicleTypeEnum {
+ extension VehicleTypeEnumExtension on VehicleTypeEnum {
   IconData get iconData {
     switch (this) {
       case VehicleTypeEnum.lightVehicle:

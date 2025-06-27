@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wisetrack_app/data/services/auth_api_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/login/VerificationCodeScreen.dart';
-// Asegúrate que la ruta a VerificationCodeScreen sea correcta. Lo he cambiado a OtpVerificationScreen según tu código.
- import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart'; // Asegúrate que este es el AnimatedWidget que creamos antes
+ import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';  
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({Key? key}) : super(key: key);
@@ -13,7 +12,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
-    with SingleTickerProviderStateMixin { // El TickerProvider ya estaba, ¡perfecto!
+    with SingleTickerProviderStateMixin {  
   final _emailController = TextEditingController();
   bool _isButtonEnabled = false;
   bool _isLoading = false;
@@ -25,7 +24,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     _emailController.addListener(_updateButtonState);
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4), // Duración de un ciclo de animación
+      duration: const Duration(seconds: 3), // Duración de un ciclo de animación
     );
   }
 
@@ -47,8 +46,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     return emailRegex.hasMatch(email);
   }
 
-  // --- LÓGICA REFACTORIZADA ---
-  // He movido la lógica a su propio método para mayor claridad
   Future<void> _requestReset() async {
     final email = _emailController.text.trim();
     if (!_isValidEmail(email)) {
@@ -62,13 +59,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       _isLoading = true;
     });
     
-    // Inicia la animación en bucle para mostrar la carga
     _animationController.repeat();
 
     try {
       final response = await AuthService.requestPasswordReset(email);
 
-      // Cuando la respuesta llega, completa la animación actual
       await _animationController.forward(from: _animationController.value);
       _animationController.stop();
 
@@ -81,7 +76,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         Navigator.push(
           context,
           MaterialPageRoute(
-            // El nombre de tu pantalla es OtpVerificationScreen en tu código original
             builder: (context) => OtpVerificationScreen(email: email),
           ),
         );
@@ -172,23 +166,30 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   Widget _buildBackground(BuildContext context) {
-    // Tu fondo personalizado
+    // Asegúrate de tener estas imágenes en tus assets
     return Stack(
       children: [
         Positioned(
-            top: 0,
-            right: -100, // Ajustado para que se parezca más a los ejemplos anteriores
-            child: Image.asset('assets/images/rectangle1.png', // Asegúrate que esta imagen existe
-                width: MediaQuery.of(context).size.width * 0.5)),
+          top: 0,
+          left: 0,
+          child: Image.asset(
+            'assets/images/rectangleForgot.png',
+            width: MediaQuery.of(context).size.width * 0.7,
+            fit: BoxFit.contain,
+          ),
+        ),
         Positioned(
-            bottom: 0,
-            left: -40, // Ajustado para que se parezca más a los ejemplos anteriores
-            child: Image.asset('assets/images/rectangle2.png', // Asegúrate que esta imagen existe
-                width: MediaQuery.of(context).size.width * 0.6)),
+          bottom: 0,
+          right: 0,
+          child: Image.asset(
+            'assets/images/rectangle2Forgot.png',
+            width: MediaQuery.of(context).size.width * 0.8,
+            fit: BoxFit.contain,
+          ),
+        ),
       ],
     );
   }
-
   Widget _buildHeader() {
     return Column(
       children: const [
@@ -201,7 +202,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         ),
         SizedBox(height: 16),
         Text(
-          'Ingresa tu correo electrónico para recibir el código de restablecimiento', // Texto ligeramente modificado para mayor claridad
+          'Ingresa tu correo electrónico para recibir el código de restablecimiento', 
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 16, color: Colors.black),
         ),

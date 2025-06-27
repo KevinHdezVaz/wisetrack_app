@@ -44,6 +44,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/icons/
     # Es buena práctica ser explícito con las imágenes para evitar errores
     # - assets/images/logo_w.png
     # - assets/images/splash_background.png

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:wisetrack_app/data/services/vehicles_service.dart';
+ import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/FilterBottomSheet.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/VehicleDetailScreen.dart';
-// import 'package:wisetrack_app/ui/MenuPage/moviles/VehicleDetailScreen.dart'; // Descomenta si lo necesitas
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/data/models/vehicles/Vehicle.dart';
 import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
@@ -31,12 +30,10 @@ class _MobilesScreenState extends State<MobilesScreen>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-        vsync: this,
-        duration:
-            const Duration(seconds: 5) // Duración de un ciclo de animación
-        );
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    );
     _fetchInitialData();
-    ();
   }
 
   @override
@@ -75,60 +72,6 @@ class _MobilesScreenState extends State<MobilesScreen>
         setState(() {
           _allVehicles = vehicles;
           _vehicleTypeMap = typesMap;
-          _applyFilters(); // Aplicamos filtros iniciales
-        });
-        // Añadimos el listener DESPUÉS de la carga inicial.
-        _searchController.addListener(_applyFilters);
-      }
-    } catch (e) {
-      if (mounted) {
-        _animationController.stop();
-        setState(() {
-          _errorMessage = "Error al cargar los móviles. Revisa tu conexión.";
-          debugPrint('Error al cargar datos iniciales: $e');
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        _animationController.reset();
-      }
-    }
-  }
-
-  Future<void> _loadInitialData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    _animationController.repeat();
-
-    try {
-      // Ejecutamos ambas llamadas a la API en paralelo para más eficiencia
-      final results = await Future.wait([
-        VehicleService.getAllVehicles(),
-        VehicleService.getVehicleTypes(),
-      ]);
-
-      // Extraemos los resultados
-      final List<Vehicle> vehicles = results[0] as List<Vehicle>;
-      final List<VehicleType> types = results[1] as List<VehicleType>;
-
-      // Creamos el mapa de tipos para búsquedas rápidas
-      final Map<int, String> typesMap = {
-        for (var type in types) type.id: type.name
-      };
-
-      await _animationController.forward(from: _animationController.value);
-      _animationController.stop();
-
-      if (mounted) {
-        setState(() {
-          _allVehicles = vehicles;
-          _vehicleTypeMap = typesMap; // Guardamos el mapa de tipos
           _applyFilters();
         });
         _searchController.addListener(_applyFilters);
@@ -157,17 +100,12 @@ class _MobilesScreenState extends State<MobilesScreen>
     _displayedVehicles = _allVehicles.where((vehicle) {
       final vehicleTypeName = _vehicleTypeMap[vehicle.vehicleType] ?? '';
 
-      // 1. Filtro por texto de búsqueda (patente o tipo)
       final matchesSearchQuery = vehicle.plate.toLowerCase().contains(query) ||
           vehicleTypeName.toLowerCase().contains(query);
 
-      // Si no hay filtros de chips, solo importa la búsqueda
       if (_currentFilters.isEmpty) {
         return matchesSearchQuery;
       }
-
-      // 2. Lógica de filtrado por chips (ahora dinámica)
-      // Esta lógica revisa si un tipo de filtro está activo, y si lo está, si el vehículo cumple la condición.
 
       final typeFilters = _currentFilters
           .where((f) => _vehicleTypeMap.values.contains(f))
@@ -182,14 +120,11 @@ class _MobilesScreenState extends State<MobilesScreen>
           (connectionFilters.contains('Online') && vehicle.statusDevice == 1) ||
           (connectionFilters.contains('Offline') && vehicle.statusDevice == 0);
 
-      // Añadimos la lógica para los otros filtros que tienes en el BottomSheet
       final positionFilters = _currentFilters
           .where((f) => ['Válida', 'Inválida'].contains(f))
           .toSet();
       final bool positionMatches = positionFilters.isEmpty ||
-          (positionFilters.contains('Válida') &&
-              vehicle.statusVehicle ==
-                  1) || // Asumiendo que statusVehicle indica la posición
+          (positionFilters.contains('Válida') && vehicle.statusVehicle == 1) ||
           (positionFilters.contains('Inválida') && vehicle.statusVehicle == 0);
 
       final engineStatusFilters = _currentFilters
@@ -198,10 +133,8 @@ class _MobilesScreenState extends State<MobilesScreen>
       final bool engineStatusMatches = engineStatusFilters.isEmpty ||
           (engineStatusFilters.contains('Encendido') &&
               vehicle.statusVehicle == 1) ||
-          (engineStatusFilters.contains('Apagado') &&
-              vehicle.statusVehicle == 0);
+          (engineStatusFilters.contains('Apagado') && vehicle.statusVehicle == 0);
 
-      // El vehículo debe cumplir con la búsqueda Y con todos los filtros de chips activos
       return matchesSearchQuery &&
           typeMatches &&
           connectionMatches &&
@@ -209,75 +142,58 @@ class _MobilesScreenState extends State<MobilesScreen>
           engineStatusMatches;
     }).toList();
 
-    setState(() {}); // Actualiza la UI con la lista filtrada
+    setState(() {});
   }
 
-  // --- LÓGICA DE CARGA REFINADA ---
-  Future<void> _loadVehiclesAndSetupFiltering() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    // Inicia la animación en bucle
-    _animationController.repeat();
-
-    try {
-      final vehicles = await VehicleService.getAllVehicles();
-
-      // Detiene el bucle y completa la animación
-      await _animationController.forward(from: _animationController.value);
-      _animationController.stop();
-
-      if (mounted) {
-        setState(() {
-          _allVehicles = vehicles;
-          _applyFilters();
-        });
-        _searchController.addListener(_applyFilters);
-      }
-    } catch (e) {
-      if (mounted) {
-        _animationController.stop(); // Detiene la animación en caso de error
-        setState(() {
-          _errorMessage = "Error al cargar los móviles. Revisa tu conexión.";
-          debugPrint('Error al cargar vehículos: $e');
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        _animationController.reset();
-      }
-    }
-  }
-
-  IconData _getIconForVehicleType(String typeName) {
-    // Mapeo de nombres (del API) a íconos. ¡Mucho más flexible!
-    switch (typeName.toLowerCase()) {
+  String _getIconForVehicleType(String typeName) {
+    final normalizedTypeName =
+        typeName.toLowerCase().replaceAll(' ', '_').replaceAll('/', '_');
+    switch (normalizedTypeName) {
       case 'tracto':
-        return Icons.local_shipping;
-      case 'camion 3/4':
-        return Icons.local_shipping;
-      case 'rampla seca':
-        return Icons.fire_truck_sharp; // Ícono de ejemplo
+        return 'assets/images/icons/tracto.png';
+      case 'camion_3_4':
+        return 'assets/images/icons/camion_3_4.png';
+      case 'rampla_seca':
+        return 'assets/images/icons/rampla_seca.png';
+      case 'liviano_frio':
+        return 'assets/images/icons/liviano_frio.png';
       case 'liviano':
-        return Icons.directions_car;
-      case 'liviano frio':
-        return Icons.ac_unit;
-      case 'cama baja':
-        return Icons.airport_shuttle; // Ícono de ejemplo
+        return 'assets/images/icons/liviano.png';
+      case 'cama_baja':
+        return 'assets/images/icons/cama_baja.png';
+      case 'tolva':
+        return 'assets/images/icons/tolva.png';
+      case 'caex':
+        return 'assets/images/icons/caex.png';
+      case 'grúa_horquilla':
+        return 'assets/images/icons/grua_horquilla.png';
+      case 'pluma':
+        return 'assets/images/icons/pluma.png';
+      case 'grúa_vehicular':
+        return 'assets/images/icons/grua_vehicular.png';
+      case 'carro_bomba':
+        return 'assets/images/icons/carro_bomba.png';
+      case 'furgón':
+        return 'assets/images/icons/furgon.png';
+      case 'retro_excavadora':
+        return 'assets/images/icons/retro_excavadora.png';
+      case 'cargador_frontal':
+        return 'assets/images/icons/cargador_frontal.png';
+      case 'otro':
+        return 'assets/images/icons/otro.png';
+      case 'cisterna':
+        return 'assets/images/icons/cisterna.png';
+      case 'bus':
+        return 'assets/images/icons/bus.png';
       default:
-        return Icons.help_outline;
+        return 'assets/images/icons/otro.png';
     }
   }
 
   Future<void> _refreshVehicles() async {
     _searchController.removeListener(_applyFilters);
-    _searchController.clear(); // Limpiamos la búsqueda al refrescar
-    await _fetchInitialData(); // Reutilizamos el método de carga principal
+    _searchController.clear();
+    await _fetchInitialData();
   }
 
   @override
@@ -286,9 +202,7 @@ class _MobilesScreenState extends State<MobilesScreen>
       backgroundColor: Colors.white,
       appBar: _buildAppBar(),
       body: Stack(
-        // Usamos un Stack para poder poner el overlay de carga encima del contenido
         children: [
-          // Contenido principal de la pantalla
           Column(
             children: [
               _buildSearchBar(context),
@@ -297,7 +211,6 @@ class _MobilesScreenState extends State<MobilesScreen>
               ),
             ],
           ),
-          // --- INDICADOR DE CARGA CENTRALIZADO Y DINÁMICO ---
           if (_isLoading)
             Center(
               child: AnimatedTruckProgress(
@@ -317,50 +230,68 @@ class _MobilesScreenState extends State<MobilesScreen>
           children: [
             const Icon(Icons.error_outline, color: Colors.red, size: 40),
             const SizedBox(height: 10),
-            Text(_errorMessage!,
-                style: const TextStyle(color: Colors.red),
-                textAlign: TextAlign.center),
+            Text(
+              _errorMessage!,
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _refreshVehicles,
               style:
                   ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              child: const Text('Reintentar',
-                  style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Reintentar',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),
       );
     }
     if (!_isLoading && _displayedVehicles.isEmpty) {
-      return Center(
-          child: Text(_searchController.text.isEmpty
-              ? 'No hay vehículos para mostrar.'
-              : 'No se encontraron resultados.'));
-    }
-    return _isLoading
-        ? const SizedBox.shrink()
-        : ListView.separated(
-            itemCount: _displayedVehicles.length,
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            itemBuilder: (context, index) {
-              final vehicle = _displayedVehicles[index];
-              return _buildVehicleTile(vehicle, context);
-            },
-            separatorBuilder: (context, index) => Divider(
-              height: 1,
-              thickness: 1,
-              color: Colors.grey.shade200,
-              // CORRECCIÓN: Añade un margen izquierdo para que el divisor se alinee con el texto.
-              // 72.0 es un buen valor que usualmente cubre el ícono y el padding.
-              indent: 12.0,
-              // Opcional: Un pequeño margen derecho también mejora la estética.
-              endIndent: 16.0,
+      return RefreshIndicator(
+        onRefresh: _refreshVehicles,
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height -
+                kToolbarHeight -
+                MediaQuery.of(context).padding.top,
+            child: Center(
+              child: Text(
+                _searchController.text.isEmpty
+                    ? 'No hay vehículos para mostrar.'
+                    : 'No se encontraron resultados.',
+              ),
             ),
-          );
+          ),
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _refreshVehicles,
+      color: AppColors.primary,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: _displayedVehicles.length,
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        itemBuilder: (context, index) {
+          final vehicle = _displayedVehicles[index];
+          return _buildVehicleTile(vehicle, context);
+        },
+        separatorBuilder: (context, index) => Divider(
+          height: 1,
+          thickness: 1,
+          color: Colors.grey.shade200,
+          indent: 12.0,
+          endIndent: 16.0,
+        ),
+      ),
+    );
   }
 
-  // Se extrajo la AppBar para mayor claridad
   PreferredSizeWidget _buildAppBar() {
     return PreferredSize(
       preferredSize: const Size.fromHeight(kToolbarHeight),
@@ -400,7 +331,7 @@ class _MobilesScreenState extends State<MobilesScreen>
                   ),
                 ),
               ),
-              const SizedBox(width: 40), // Para balancear el botón de regreso
+              const SizedBox(width: 40),
             ],
           ),
         ),
@@ -408,7 +339,6 @@ class _MobilesScreenState extends State<MobilesScreen>
     );
   }
 
-  // --- El resto de tus widgets no necesitan cambios ---
   Widget _buildSearchBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -453,75 +383,85 @@ class _MobilesScreenState extends State<MobilesScreen>
     );
   }
 
-   Widget _buildVehicleTile(Vehicle vehicle, BuildContext context) {
-  final String vehicleTypeName = _vehicleTypeMap[vehicle.vehicleType] ?? 'Desconocido';
-  final IconData vehicleIcon = _getIconForVehicleType(vehicleTypeName);
-  Color iconBgColor = vehicle.statusDevice == 1
-      ? AppColors.primary.withOpacity(0.8)
-      : Colors.red.shade400;
+  Widget _buildVehicleTile(Vehicle vehicle, BuildContext context) {
+    final String vehicleTypeName =
+        _vehicleTypeMap[vehicle.vehicleType] ?? 'Desconocido';
+    final String vehicleIconPath = _getIconForVehicleType(vehicleTypeName);
+    Color iconBgColor = vehicle.statusDevice == 1
+        ? AppColors.primary.withOpacity(0.8)
+        : Colors.red.shade400;
 
-  bool isLocationActive = vehicle.statusVehicle == 1;
-  bool isGpsActive = vehicle.statusDevice == 1;
-  bool isKeyActive = false; // Replace with actual logic if available
-  bool isShieldActive = false; // Replace with actual logic if available
+    bool isLocationActive = vehicle.statusVehicle == 1;
+    bool isGpsActive = vehicle.statusDevice == 1;
+    bool isKeyActive = false; // Reemplazar con lógica real si está disponible
+    bool isShieldActive = false; // Reemplazar con lógica real si está disponible
 
-  return InkWell(
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => VehicleDetailScreen(plate: vehicle.plate),
-        ),
-      );
-    },
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 18.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Vehicle type icon
-          CircleAvatar(
-            backgroundColor: iconBgColor,
-            child: Icon(vehicleIcon, color: Colors.white, size: 24),
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VehicleDetailScreen(plate: vehicle.plate),
           ),
-          const SizedBox(width: 16),
-          // Vehicle details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  vehicle.plate,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 18.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Ícono del tipo de vehículo
+            CircleAvatar(
+              backgroundColor: iconBgColor,
+              child: ClipOval(
+                child: Image.asset(
+                  vehicleIconPath,
+                  width: 30,
+                  height: 30,
+                  color: Colors.white,
+                  fit: BoxFit.contain,
                 ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Detalles del vehículo
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    vehicle.plate,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ],
+              ),
+            ),
+            // Íconos de estado
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _statusIcon('ubi', isLocationActive),
+                _statusIcon('gps', isGpsActive),
+                _statusIcon('llave', isKeyActive),
+                // _statusIcon('shield', isShieldActive),
               ],
             ),
-          ),
-          // Status icons
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _statusIcon('ubi', isLocationActive),
-              _statusIcon('gps', isGpsActive),
-              _statusIcon('llave', isKeyActive),
-        //      _statusIcon('shield', isShieldActive),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-Widget _statusIcon(String baseName, bool isActive) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 10.0),
-    child: Image.asset(
-      'assets/images/${baseName}_${isActive ? 'on' : 'off'}.png',
-      width: 23.0,
-      height: 23.0,
-    ),
-  );
-}
+  Widget _statusIcon(String baseName, bool isActive) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10.0),
+      child: Image.asset(
+        'assets/images/${baseName}_${isActive ? 'on' : 'off'}.png',
+        width: 23.0,
+        height: 23.0,
+      ),
+    );
+  }
 }

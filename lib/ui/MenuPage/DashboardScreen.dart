@@ -79,6 +79,28 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     super.dispose();
   }
 
+
+Future<void> _handleInvalidToken() async {
+  // Mostramos un mensaje al usuario
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.'),
+      backgroundColor: Colors.orange,
+    ),
+  );
+  
+  // Borramos el token inválido del almacenamiento
+  await TokenStorage.deleteToken();
+
+  // Esperamos un momento para que el usuario vea el mensaje
+  await Future.delayed(const Duration(seconds: 2));
+
+  // Redirigimos al login y limpiamos todas las pantallas anteriores
+  if (mounted) {
+    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+  }
+}
+
   /// Inicializa todos los datos del dashboard en paralelo para máxima eficiencia.
   Future<void> _initializeDashboardData() async {
     setState(() => _isLoading = true);
@@ -87,7 +109,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     try {
       final results = await Future.wait([
         VehicleService.getAllVehicles(),
-        VehiclePositionService.getAllVehiclesPosition(),
+        VehiclePositionService.getVehiclesPositions(),
         VehicleService.getVehicleTypes(),
       ]);
 
@@ -106,22 +128,29 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         });
       }
 
-    } catch (e) {
-      print('Error al inicializar datos del dashboard: $e');
+     } catch (e) {
+    print('Error al inicializar datos del dashboard: $e');
+
+    // --- LÓGICA CLAVE PARA MANEJAR EL ERROR 401 ---
+    if (e.toString().contains('401')) {
+      if (mounted) {
+        _handleInvalidToken();
+      }
+    } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('No se pudieron cargar los datos: $e')),
         );
       }
-    } finally {
-      if(mounted) {
-        setState(() => _isLoading = false);
-        _animationController.stop();
-        _animationController.reset();
-      }
+    }
+  } finally {
+    if (mounted && !_isLoggingOut) { // _isLoggingOut es la variable que tenías para el logout
+      setState(() => _isLoading = false);
+      _animationController.stop();
+      _animationController.reset();
     }
   }
-
+}
   /// Procesa las posiciones de los vehículos y las convierte en marcadores.
   void _setupMarkers(List<VehicleCurrentPosition> positions) {
       final Map<String, LatLng> positionsMap = {};
@@ -279,7 +308,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             ],
           ),
         ),
-        if (_isLoading)
+if (_isLoading || _isLoggingOut) // Agrega _isLoggingOut aquí
           Positioned.fill(
             child: AnimatedTruckProgress(animation: _animationController),
           ),
@@ -375,17 +404,16 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     );
   }   
  
- 
-Future<void> _logout() async {
+ Future<void> _logout() async {
   if (_isLoggingOut) return; // Evita múltiples llamadas
-  
+
   setState(() => _isLoggingOut = true);
   _animationController.repeat(); // Inicia la animación
 
   try {
     // 1. Ejecutar el logout en el backend
     final logoutResponse = await AuthService.logout();
-    
+
     // 2. Mostrar feedback al usuario según la respuesta
     if (logoutResponse.detail == null || logoutResponse.detail!.contains('Error')) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -402,17 +430,6 @@ Future<void> _logout() async {
         ),
       );
     }
-
-    // 3. Esperar un poco para que se vea la animación (opcional)
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // 4. Navegar a la pantalla de login y limpiar el stack de navegación
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      '/login',
-      (route) => false,
-    );
-
   } catch (e) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -423,11 +440,11 @@ Future<void> _logout() async {
   } finally {
     // Asegurarse de eliminar el token incluso si falla el logout
     await TokenStorage.deleteToken();
-    
+
     // Detener y resetear la animación
     _animationController.stop();
     _animationController.reset();
-    
+
     if (mounted) {
       setState(() => _isLoggingOut = false);
     }

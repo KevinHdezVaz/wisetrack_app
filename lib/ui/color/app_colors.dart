@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 class AppColors {
   // Color primario (00636A) y sus variantes
   static const Color primary = Color(0xFF00636A);
+   static const Color ColorFooter = Color(0xFF008C95);
   static const Color primaryLight = Color(0xFF428E94);
   static const Color primaryLighter = Color(0xFF7AB9BF);
   static const Color primaryDark = Color(0xFF003A40);

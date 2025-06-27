@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // Para formatear fechas
+import 'package:intl/intl.dart';  
 import 'package:wisetrack_app/data/models/alert/AlertModel.dart';
-  import 'package:wisetrack_app/data/services/AlertService.dart'; // Importamos el nuevo servicio
+  import 'package:wisetrack_app/data/services/AlertService.dart';  
 import 'package:wisetrack_app/ui/MenuPage/notifications/NotificationDetailScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
+import 'package:wisetrack_app/utils/ReadStatusManager.dart';
 
  
 class NotificationsScreen extends StatefulWidget {
@@ -15,26 +16,27 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> with SingleTickerProviderStateMixin {
-  // --- Estado de la UI y Datos ---
-  bool _isLoading = true;
+   bool _isLoading = true;
   String? _errorMessage;
   late AnimationController _animationController;
 
-  // Los filtros ahora se usarán para filtrar los datos reales
-  int _selectedFilterIndex = 0;
+   int _selectedFilterIndex = 0;
   final List<String> _filters = ['Todas', 'Velocidad', 'Comandos', 'Posición', 'Arranque'];
 
-  // Listas para almacenar las alertas obtenidas de la API
-  List<Alertas> _allAlerts = [];
+   List<Alertas> _allAlerts = [];
   List<Alertas> _todayAlerts = [];
   List<Alertas> _previouslyAlerts = [];
+
+
+  Set<String> _readAlertIds = {};
+
 
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(vsync: this, duration: const Duration(seconds: 5));
-    _fetchAlerts();
+    _fetchInitialData();
   }
 
   @override
@@ -43,17 +45,41 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     super.dispose();
   }
 
-  /// Llama al servicio para obtener las alertas y las procesa.
-  Future<void> _fetchAlerts() async {
+  void _handleNotificationTap(Alertas alert) {
+    final alertId = ReadStatusManager.getUniqueId(alert.plate, alert.alertDate);
+    
+    // Si la alerta no ha sido leída, la marcamos ahora
+    if (!_readAlertIds.contains(alertId)) {
+      setState(() {
+        _readAlertIds.add(alertId);
+      });
+      ReadStatusManager.markAlertAsRead(alertId);
+    }
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => NotificationDetailScreen(alert: alert)),
+    );
+  }
+
+ Future<void> _fetchInitialData() async {
     setState(() => _isLoading = true);
     _animationController.repeat();
 
     try {
-      final alerts = await AlertService.getAlerts();
+       final results = await Future.wait([
+        AlertService.getAlerts(),
+        ReadStatusManager.getReadAlertIds(),
+      ]);
+      
+      final alerts = results[0] as List<Alertas>;
+      final readIds = results[1] as Set<String>;
+
       if (mounted) {
         setState(() {
           _allAlerts = alerts;
-          _applyFiltersAndGroup(); // Filtra y agrupa las alertas
+          _readAlertIds = readIds;  
+          _applyFiltersAndGroup();
         });
       }
     } catch (e) {
@@ -70,44 +96,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     }
   }
 
-  /// Filtra y agrupa las alertas en "Hoy" y "Anteriormente".
-  void _applyFiltersAndGroup() {
-    List<Alertas> filteredAlerts = List.from(_allAlerts);
+    void _applyFiltersAndGroup() {
+    List<Alertas> filteredAlerts = _allAlerts;
 
-    // Filtra por el chip seleccionado (excepto para "Todas")
     if (_selectedFilterIndex != 0) {
       final filter = _filters[_selectedFilterIndex].toLowerCase();
       filteredAlerts = _allAlerts.where((alert) {
-        // Lógica de filtrado simple basada en el nombre de la alerta
         return alert.name.toLowerCase().contains(filter);
-        
       }).toList();
     }
     
-    // Separa en grupos de "Hoy" y "Anteriormente"
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     
-    List<Alertas> todayList = [];
-    List<Alertas> previouslyList = [];
+    _todayAlerts = filteredAlerts.where((alert) {
+      if (alert.alertDate == null) return false;
+      final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
+      return alertDay.isAtSameMomentAs(today);
+    }).toList();
 
-    for (var alert in filteredAlerts) {
-      if (alert.alertDate != null) {
-        final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
-        if (alertDay.isAtSameMomentAs(today)) {
-          todayList.add(alert);
-        } else {
-          previouslyList.add(alert);
-        }
-      } else {
-        previouslyList.add(alert); // Si no tiene fecha, va a "Anteriormente"
-      }
-    }
+    _previouslyAlerts = filteredAlerts.where((alert) {
+      if (alert.alertDate == null) return true;
+      final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
+      return !alertDay.isAtSameMomentAs(today);
+    }).toList();
 
-    setState(() {
-      _todayAlerts = todayList;
-      _previouslyAlerts = previouslyList;
-    });
+    setState(() {});
   }
 
   @override
@@ -181,7 +195,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
                 if (selected) {
                   setState(() {
                     _selectedFilterIndex = index;
-                    _applyFiltersAndGroup(); // Vuelve a filtrar y agrupar con el nuevo filtro
+                    _applyFiltersAndGroup();  
                   });
                 }
               },
@@ -198,36 +212,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
       ),
     );
   }
-
-  /// El ListTile ahora recibe un objeto 'Alert' y muestra sus datos.
   Widget _buildNotificationTile(Alertas alert) {
-    bool isUnread = alert.status == 0; // Asumimos que status 0 = no leída
+     final alertId = ReadStatusManager.getUniqueId(alert.plate, alert.alertDate);
+    final bool isUnread = !_readAlertIds.contains(alertId);
 
     return ListTile(
       leading: CircleAvatar(
         radius: 25,
         backgroundColor: isUnread ? AppColors.primary.withOpacity(0.1) : Colors.grey.shade200,
-        child: Icon(
-          _getIconForAlert(alert.name),
-          color: AppColors.primary,
-          size: 28,
-        ),
+        child: Icon(_getIconForAlert(alert.name), color: AppColors.primary, size: 28),
       ),
       title: Row(
         children: [
-          Text(alert.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          Expanded(child: Text(alert.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis)),
           if (isUnread) ...[
             const SizedBox(width: 6),
-            Container(
-              width: 8, height: 8,
-              decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-            ),
+            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
           ],
-          const Spacer(),
-          Text(
-            _formatAlertDate(alert.alertDate),
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-          ),
+          const SizedBox(width: 8),
+          Text(_formatAlertDate(alert.alertDate), style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
         ],
       ),
       subtitle: Padding(
@@ -240,16 +243,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         ),
       ),
       isThreeLine: true,
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => NotificationDetailScreen(alert: alert,)),
-        );
-      },
+      onTap: () => _handleNotificationTap(alert), 
     );
   }
 
-  /// Helper para devolver un ícono según el nombre de la alerta.
   IconData _getIconForAlert(String alertName) {
     String name = alertName.toLowerCase();
     if (name.contains('velocidad')) return Icons.speed;
@@ -259,7 +256,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     return Icons.notifications; // Ícono por defecto
   }
 
-  /// Helper para formatear la fecha de la alerta.
   String _formatAlertDate(DateTime? date) {
     if (date == null) return '';
     final now = DateTime.now();
@@ -303,8 +299,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
               style: TextStyle(color: Colors.grey.shade700)),
           TextButton(
             onPressed: () {
-              // TODO: Navegar a la pantalla de historial
-            },
+             },
             child: const Text('Ir al historial',
                 style: TextStyle(
                     color: AppColors.primary, fontWeight: FontWeight.bold)),

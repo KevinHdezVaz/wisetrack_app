@@ -223,16 +223,48 @@ Future<void> _handleInvalidToken() async {
   }
 
   /// Devuelve el IconData apropiado para el nombre del tipo de vehículo.
-  IconData _getIconForVehicleType(String typeName) {
-    switch (typeName.toLowerCase()) {
-      case 'tracto': return Icons.local_shipping;
-      case 'camion 3/4': return Icons.local_shipping;
-      case 'rampla seca': return Icons.fire_truck_sharp;
-      case 'liviano': return Icons.directions_car;
-      case 'liviano frio': return Icons.ac_unit;
-      case 'cama baja': return Icons.airport_shuttle;
-      case 'otro': return Icons.help_outline;
-      default: return Icons.help_outline;
+ String _getIconPathForVehicleType(String typeName) {
+    final normalizedTypeName =
+        typeName.toLowerCase().replaceAll(' ', '_').replaceAll('/', '_');
+    switch (normalizedTypeName) {
+      case 'tracto':
+        return 'assets/images/icons/tracto.png';
+      case 'camion_3_4':
+        return 'assets/images/icons/camion_3_4.png';
+      case 'rampla_seca':
+        return 'assets/images/icons/rampla_seca.png';
+      case 'liviano_frio':
+        return 'assets/images/icons/liviano_frio.png';
+      case 'liviano':
+        return 'assets/images/icons/liviano.png';
+      case 'cama_baja':
+        return 'assets/images/icons/cama_baja.png';
+      case 'tolva':
+        return 'assets/images/icons/tolva.png';
+      case 'caex':
+        return 'assets/images/icons/caex.png';
+      case 'grúa_horquilla':
+        return 'assets/images/icons/grua_horquilla.png';
+      case 'pluma':
+        return 'assets/images/icons/pluma.png';
+      case 'grúa_vehicular':
+        return 'assets/images/icons/grua_vehicular.png';
+      case 'carro_bomba':
+        return 'assets/images/icons/carro_bomba.png';
+      case 'furgón':
+        return 'assets/images/icons/furgon.png';
+      case 'retro_excavadora':
+        return 'assets/images/icons/retro_excavadora.png';
+      case 'cargador_frontal':
+        return 'assets/images/icons/cargador_frontal.png';
+      case 'otro':
+        return 'assets/images/icons/otro.png';
+      case 'cisterna':
+        return 'assets/images/icons/cisterna.png';
+      case 'bus':
+        return 'assets/images/icons/bus.png';
+      default:
+        return 'assets/images/icons/otro.png'; // Un ícono por defecto
     }
   }
 
@@ -369,18 +401,26 @@ if (_isLoading || _isLoggingOut) // Agrega _isLoggingOut aquí
     );
   }
 
+// --- MODIFICACIÓN FINAL: AÑADIR CÍRCULO DE FONDO AL ÍCONO ---
   Widget _buildSearchResultsList() {
     if (!_isSearchFocused || _filteredVehicles.isEmpty) {
       return const SizedBox.shrink();
     }
     const double itemHeight = 54.0;
-    final int displayItemCount = _filteredVehicles.length > 5 ? 5 : _filteredVehicles.length;
+    final int displayItemCount =
+        _filteredVehicles.length > 5 ? 5 : _filteredVehicles.length;
     final double containerHeight = displayItemCount * itemHeight;
 
     return Container(
       margin: const EdgeInsets.only(top: 10.0, left: 56.0, right: 56.0),
       height: containerHeight,
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black.withOpacity(0.15))]),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                blurRadius: 10, color: Colors.black.withOpacity(0.15))
+          ]),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: ListView.separated(
@@ -388,21 +428,42 @@ if (_isLoading || _isLoggingOut) // Agrega _isLoggingOut aquí
           itemCount: _filteredVehicles.length,
           itemBuilder: (context, index) {
             final vehicle = _filteredVehicles[index];
-            final String vehicleTypeName = _vehicleTypeMap[vehicle.vehicleType] ?? 'Desconocido';
-            final IconData vehicleIcon = _getIconForVehicleType(vehicleTypeName);
+            final String vehicleTypeName =
+                _vehicleTypeMap[vehicle.vehicleType] ?? 'Desconocido';
+            final String vehicleIconPath =
+                _getIconPathForVehicleType(vehicleTypeName);
+
+            // 1. Se calcula el color de fondo basado en el estado del dispositivo
+            //    (1 = Online, cualquier otro valor = Offline).
+            final Color iconBgColor = vehicle.statusDevice == 1
+                ? AppColors.primary.withOpacity(0.8)
+                : Colors.red.shade400;
 
             return ListTile(
-              leading: SizedBox(width: 40, height: 40, child: Center(child: Icon(vehicleIcon, size: 24, color: AppColors.primary))),
+              // 2. Se reemplaza el `leading` por un CircleAvatar.
+              leading: CircleAvatar(
+                backgroundColor: iconBgColor,
+                radius: 20, // Radio del círculo
+                child: Image.asset(
+                  vehicleIconPath,
+                  width: 24, // Tamaño del ícono dentro del círculo
+                  height: 24,
+                  // 3. Se cambia el color del ícono a blanco para que contraste.
+                  color: Colors.white,
+                  fit: BoxFit.contain,
+                ),
+              ),
               title: Text(vehicle.plate),
-               onTap: () => _onVehicleSelected(vehicle),
+              onTap: () => _onVehicleSelected(vehicle),
               dense: true,
             );
           },
-          separatorBuilder: (context, index) => const Divider(height: 1, indent: 16),
+          separatorBuilder: (context, index) =>
+              const Divider(height: 1, indent: 16),
         ),
       ),
     );
-  }   
+  }
  
  Future<void> _logout() async {
   if (_isLoggingOut) return; // Evita múltiples llamadas
@@ -423,12 +484,7 @@ if (_isLoading || _isLoggingOut) // Agrega _isLoggingOut aquí
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sesión cerrada exitosamente'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      
     }
   } catch (e) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -458,84 +514,72 @@ if (_isLoading || _isLoggingOut) // Agrega _isLoggingOut aquí
   }
 }
 
-  Future<void> _requestLocationPermissionAndAnimate() async {
-    var status = await Permission.location.status;
-    if (status.isDenied) {
-      status = await Permission.location.request();
-    }
+Future<void> _requestLocationPermissionAndAnimate() async {
+  // 1. Pide directamente el permiso. Esto mostrará el diálogo si es necesario.
+  PermissionStatus status = await Permission.location.request();
 
-    if (status.isGranted) {
-      try {
-        Position newPosition = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
+  // 2. Imprime el estado real para depurar
+  print('Estado final del permiso de ubicación: $status');
+
+  // 3. Evalúa el estado devuelto
+  if (status.isGranted || status.isLimited) { // isLimited es para iOS 14+
+    try {
+      Position newPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // --- INICIO DE LA LÓGICA DE CACHÉ ---
+      bool hasMovedSignificantly = true; 
+      if (_lastKnownPosition != null) {
+        final distanceInMeters = Geolocator.distanceBetween(
+          _lastKnownPosition!.latitude,
+          _lastKnownPosition!.longitude,
+          newPosition.latitude,
+          newPosition.longitude,
         );
-
-        // --- INICIO DE LA LÓGICA DE CACHÉ ---
-
-        bool hasMovedSignificantly = true; // Asumimos que sí por defecto.
-
-        if (_lastKnownPosition != null) {
-          // Calcula la distancia entre la nueva posición y la última guardada.
-          final distanceInMeters = Geolocator.distanceBetween(
-            _lastKnownPosition!.latitude,
-            _lastKnownPosition!.longitude,
-            newPosition.latitude,
-            newPosition.longitude,
-          );
-
-          print(
-              "Distancia desde la última posición: ${distanceInMeters.toStringAsFixed(2)} metros.");
-
-          // Si la distancia es menor que nuestro umbral, no hacemos nada.
-          if (distanceInMeters < _locationChangeThreshold) {
-            hasMovedSignificantly = false;
-            print(
-                "El usuario no se ha movido lo suficiente. No se animará el mapa.");
-          }
-        }
-
-        // Solo animamos la cámara si es la primera vez o si se ha movido lo suficiente.
-        if (hasMovedSignificantly) {
-          print("Actualizando la vista del mapa a la nueva ubicación.");
-
-          final GoogleMapController controller = await _mapController.future;
-          await controller.animateCamera(
-            CameraUpdate.newCameraPosition(
-              CameraPosition(
-                target: LatLng(newPosition.latitude, newPosition.longitude),
-                zoom: 15.0,
-              ),
-            ),
-          );
-
-          // Actualizamos la última posición conocida.
-          setState(() {
-            _lastKnownPosition = newPosition;
-          });
-        }
-        // --- FIN DE LA LÓGICA DE CACHÉ ---
-
-        // El marcador de ubicación del usuario se actualiza siempre.
-        _updateUserLocationMarker(newPosition);
-      } catch (e) {
-        print("Error al obtener la ubicación: $e");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'No se pudo obtener la ubicación. Asegúrate de que tu GPS esté activado.'),
-            ),
-          );
+        print("Distancia desde la última posición: ${distanceInMeters.toStringAsFixed(2)} metros.");
+        if (distanceInMeters < _locationChangeThreshold) {
+          hasMovedSignificantly = false;
+          print("El usuario no se ha movido lo suficiente. No se animará el mapa.");
         }
       }
-    } else {
-      print("Permiso de ubicación denegado.");
+
+      if (hasMovedSignificantly) {
+        print("Actualizando la vista del mapa a la nueva ubicación.");
+        final GoogleMapController controller = await _mapController.future;
+        await controller.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(newPosition.latitude, newPosition.longitude),
+              zoom: 15.0,
+            ),
+          ),
+        );
+        setState(() {
+          _lastKnownPosition = newPosition;
+        });
+      }
+      _updateUserLocationMarker(newPosition);
+
+    } catch (e) {
+      print("Error al obtener la ubicación: $e");
       if (mounted) {
-        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo obtener la ubicación. Asegúrate de que tu GPS esté activado.'),
+          ),
+        );
       }
     }
-  }  
-  
+  } else if (status.isDenied) {
+      print("El usuario denegó el permiso de ubicación para esta sesión.");
+
+  } else if (status.isPermanentlyDenied) {
+      print("El permiso de ubicación fue denegado permanentemente. Abriendo configuración.");
+ 
+     
+  }
+}  
   
    /// Actualiza o añade el marcador de la ubicación actual del usuario.
   void _updateUserLocationMarker(Position position) {
@@ -597,8 +641,7 @@ if (_isLoading || _isLoggingOut) // Agrega _isLoggingOut aquí
   }
 
 
-
- Widget _buildFloatingActionButtons() {
+Widget _buildFloatingActionButtons() {
   return Positioned(
     bottom: 30,
     right: 16,
@@ -618,12 +661,11 @@ if (_isLoading || _isLoggingOut) // Agrega _isLoggingOut aquí
                 fit: BoxFit.cover,
               ),
             ),
-            child: Center(
-              child: Image.asset(
-                'assets/images/mas.png',
-                width: 20,
-                height: 20,
-              ),
+            alignment: Alignment.center, // Añade esto
+            child: Image.asset(
+              'assets/images/mas.png',
+              width: 20,
+              height: 20,
             ),
           ),
         ),
@@ -642,13 +684,12 @@ if (_isLoading || _isLoggingOut) // Agrega _isLoggingOut aquí
                 fit: BoxFit.cover,
               ),
             ),
-            child: Center(
-              child: Image.asset(
-                'assets/images/menos.png',
-                width: 20,
-                height: 20,
-                color: Colors.white,
-              ),
+            alignment: Alignment.center, // Añade esto
+            child: Image.asset(
+              'assets/images/menos.png',
+              width: 20,
+              height: 20,
+              color: Colors.white,
             ),
           ),
         ),
@@ -664,18 +705,16 @@ if (_isLoading || _isLoggingOut) // Agrega _isLoggingOut aquí
                 fit: BoxFit.cover,
               ),
             ),
-            child: Center(
-              child: Image.asset(
-                'assets/images/gps.png',
-                width: 20,
-                height: 20,
-                color: Colors.white,
-              ),
+            alignment: Alignment.center, // Añade esto
+            child: Image.asset(
+              'assets/images/gps.png',
+              width: 20,
+              height: 20,
+              color: Colors.white,
             ),
           ),
         ),
       ],
     ),
   );
-}
-}
+}}

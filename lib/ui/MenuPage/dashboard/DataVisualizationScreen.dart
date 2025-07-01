@@ -91,6 +91,8 @@ class _DataVisualizationScreenState extends State<DataVisualizationScreen> {
           maxValue: maxStatusValue,
           dataType: 'd_vehicles_status', // Se pasa el dataType correcto
         ),
+                const SizedBox(height: 30),
+
       ],
     );
   }
@@ -176,7 +178,7 @@ class ChartCard extends StatelessWidget {
               _buildHorizontalBarChart(),
               const SizedBox(height: 16),
               const Divider(),
-              _buildFooter(),
+              _buildFooter(context),
             ],
           ),
         ),
@@ -285,7 +287,7 @@ class ChartCard extends StatelessWidget {
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 8.0),
       child: Row(
@@ -294,7 +296,17 @@ class ChartCard extends StatelessWidget {
           Text('$totalLabel: $totalValue',
               style: const TextStyle(fontWeight: FontWeight.bold)),
           InkWell(
-            onTap: () {},
+            onTap: () {
+                 Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DataVisualizationDetail(
+              title: title,
+              dataType: dataType,
+            ),
+          ),
+        );
+            },
             child: Row(
               children: [
                 Text('Ver más', style: TextStyle(color: AppColors.primary)),

@@ -19,6 +19,64 @@ class AlertService {
     };
   }
 
+
+
+  /// Obtiene los tipos de alerta disponibles
+  static Future<List<AlertType>> getAlertTypes() async {
+    final url = Uri.parse('${Constants.baseUrl}/alert/get-types');
+    
+    debugPrint('AlertService: Obteniendo tipos de alerta de: $url');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: await _getAuthHeaders(),
+      );
+
+      debugPrint('AlertService: Respuesta tipos ${response.statusCode}: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final String responseBody = utf8.decode(response.bodyBytes);
+        final Map<String, dynamic> data = jsonDecode(responseBody);
+        final typesResponse = AlertTypesResponse.fromJson(data);
+        return typesResponse.data;
+      } else {
+        throw Exception('Failed to load alert types: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('AlertService: Error en getAlertTypes: $e');
+      throw Exception('Alert types request failed: $e');
+    }
+  }
+
+  /// Obtiene alertas por tipo específico
+  static Future<List<Alertas>> getAlertsByType(int typeId) async {
+    final url = Uri.parse('${Constants.baseUrl}/alert/get-by-type/$typeId');
+    
+    debugPrint('AlertService: Obteniendo alertas por tipo: $url');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: await _getAuthHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final String responseBody = utf8.decode(response.bodyBytes);
+        final Map<String, dynamic> data = jsonDecode(responseBody);
+        final alertsResponse = AlertsResponse.fromJson(data);
+        return alertsResponse.data;
+      } else {
+        throw Exception('Failed to load alerts by type: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('AlertService: Error en getAlertsByType: $e');
+      throw Exception('Alerts by type request failed: $e');
+    }
+  }
+
+
+  
   /// Obtiene una lista de todas las alertas.
   static Future<List<Alertas>> getAlerts() async {
     // IMPORTANTE: Debes confirmar la URL correcta para obtener las alertas.

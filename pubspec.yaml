@@ -26,6 +26,14 @@ dependencies:
   permission_handler: ^11.3.1
   shared_preferences: ^2.2.3 # Se actualizó a la versión más reciente
   http: ^0.13.5
+  screenshot: ^3.0.0
+  pdf: ^3.10.8
+  path_provider: ^2.1.5
+  device_info_plus: ^10.1.2
+  url_launcher: ^6.1.11  # Para launchUrl
+  share_plus: ^7.0.0     # Para Share en iOS
+  open_file_plus: ^3.4.1+1
+  image: ^4.5.4
 
 
 dev_dependencies:
@@ -45,6 +53,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/icons/
+    - assets/fonts/
     # Es buena práctica ser explícito con las imágenes para evitar errores
     # - assets/images/logo_w.png
     # - assets/images/splash_background.png

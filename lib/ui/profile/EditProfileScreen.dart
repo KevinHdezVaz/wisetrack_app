@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wisetrack_app/data/services/UserService.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
-import 'package:wisetrack_app/data/models/User/UserDetail.dart'; // Importa UserDetail
-
+ 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
 
@@ -41,7 +40,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _userDetail = userDetail;
           _nameController.text = userDetail.fullName ?? '';
           _emailController.text = userDetail.username;
-          _companyController.text = userDetail.company?.toString() ?? '';
+_companyController.text = userDetail.company?.name ?? 'Sin compañía';
           _isLoading = false;
         });
       }
@@ -113,7 +112,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         const SizedBox(height: 20),
                         _buildTextField(
                             label: 'Empresa', controller: _companyController),
-                        const SizedBox(height: 120), // Espacio para el botón
+                        const SizedBox(height: 120),  
                       ],
                     ),
           _buildSaveChangesButton(),
@@ -201,53 +200,46 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         color: Colors.white,
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: _isLoading
-              ? null
-              : () async {
-                  // Mostrar CircularProgressIndicator en un diálogo
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (dialogContext) {
-                      return const Center(
-                        child:
-                            CircularProgressIndicator(color: AppColors.primary),
-                      );
-                    },
-                  );
+         onPressed: _isLoading ? null : () async {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => const Center(
+      child: CircularProgressIndicator(color: AppColors.primary),
+    ),
+  );
 
-                  try {
-                    // TODO: Implementar lógica para actualizar el perfil
-                    // Por ejemplo, llamar a un método UserService.updateUserDetail
-                    print('Guardando cambios:');
-                    print('Nombre: ${_nameController.text}');
-                    print('Email: ${_emailController.text}');
-                    print('Empresa: ${_companyController.text}');
+  try {
+    // Dividir nombre completo en nombre y apellido
+    final nameParts = _nameController.text.split(' ');
+    final firstName = nameParts.first;
+    final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : null;
 
-                    // Simular una petición (reemplazar con el endpoint real)
-                    await Future.delayed(const Duration(seconds: 1));
+    // Crear objeto actualizado
+    final updatedUser = UserDetail(
+      username: _emailController.text,
+      name: firstName,
+      lastname: lastName,
+      company: _userDetail?.company, // Mantener la misma compañía
+      phone: _userDetail?.phone, // Mantener el mismo teléfono
+      permission: _userDetail?.permission ?? [], // Mantener mismos permisos
+    );
 
-                    // Cerrar el diálogo
-                    Navigator.of(context).pop();
+    // TODO: Implementar UserService.updateUserDetail(updatedUser)
+    await Future.delayed(const Duration(seconds: 1)); // Simulación
 
-                    // Mostrar mensaje de éxito (opcional)
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Perfil actualizado correctamente')),
-                    );
-
-                    // Regresar a la pantalla anterior
-                    Navigator.of(context).pop();
-                  } catch (e) {
-                    // Cerrar el diálogo
-                    Navigator.of(context).pop();
-
-                    // Mostrar error
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error al guardar cambios: $e')),
-                    );
-                  }
-                },
+    Navigator.of(context).pop(); // Cerrar diálogo
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Perfil actualizado correctamente')),
+    );
+    Navigator.of(context).pop(); // Regresar
+  } catch (e) {
+    Navigator.of(context).pop(); // Cerrar diálogo
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: ${e.toString()}')),
+    );
+  }
+},
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             disabledBackgroundColor: AppColors.disabled,

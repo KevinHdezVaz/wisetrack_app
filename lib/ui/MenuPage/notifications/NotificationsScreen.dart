@@ -16,19 +16,31 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> with SingleTickerProviderStateMixin {
-   bool _isLoading = true;
+  bool _isLoading = true;
   String? _errorMessage;
   late AnimationController _animationController;
 
-   int _selectedFilterIndex = 0;
-  final List<String> _filters = ['Todas', 'Velocidad', 'Comandos', 'Posición', 'Arranque'];
+  int _selectedFilterIndex = 0;
+  List<String> _filters = ['Todas']; 
 
-   List<Alertas> _allAlerts = [];
+  List<AlertType> _alertTypes = []; // Lista de tipos de alerta del servicio
+
+
+  List<Alertas> _allAlerts = [];
   List<Alertas> _todayAlerts = [];
   List<Alertas> _previouslyAlerts = [];
-
-
   Set<String> _readAlertIds = {};
+
+   final Map<String, List<String>> _alertCategories = {
+    'Velocidad': ['Velocidad Maxima'],
+    'Conducción': [
+      'Alerta conduccion 10 Horas',
+      'Alerta conduccion continua',
+      'Alerta descanso corto'
+    ],
+    'Destino': ['No presentación en destino'],
+    'Otros': [] 
+  };
 
 
 
@@ -48,8 +60,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
   void _handleNotificationTap(Alertas alert) {
     final alertId = ReadStatusManager.getUniqueId(alert.plate, alert.alertDate);
     
-    // Si la alerta no ha sido leída, la marcamos ahora
-    if (!_readAlertIds.contains(alertId)) {
+     if (!_readAlertIds.contains(alertId)) {
       setState(() {
         _readAlertIds.add(alertId);
       });
@@ -62,23 +73,72 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     );
   }
 
- Future<void> _fetchInitialData() async {
+void _generateFiltersFromAlerts(List<Alertas> alerts) {
+  // Primero obtenemos todos los tipos de alerta únicos que existen realmente
+  final availableTypes = alerts
+      .map((alert) => alert.alertType.name) // Usamos el nombre del tipo, no de la alerta
+      .toSet() // Eliminamos duplicados
+      .toList();
+
+  setState(() {
+    _filters = ['Todas', ...availableTypes];
+  });
+}
+
+void _applyFiltersAndGroup() {
+  List<Alertas> filteredAlerts = _allAlerts;
+
+  if (_selectedFilterIndex != 0) {
+    final selectedType = _filters[_selectedFilterIndex];
+    filteredAlerts = _allAlerts.where((alert) {
+      // Comparamos con el nombre del tipo de alerta, no con el nombre de la alerta
+      return alert.alertType.name == selectedType;
+    }).toList();
+  }
+  
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  
+  _todayAlerts = filteredAlerts.where((alert) {
+    if (alert.alertDate == null) return false;
+    final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
+    return alertDay.isAtSameMomentAs(today);
+  }).toList();
+
+  _previouslyAlerts = filteredAlerts.where((alert) {
+    if (alert.alertDate == null) return true;
+    final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
+    return !alertDay.isAtSameMomentAs(today);
+  }).toList();
+
+  setState(() {});
+}
+
+
+
+  Future<void> _fetchInitialData() async {
     setState(() => _isLoading = true);
     _animationController.repeat();
 
     try {
-       final results = await Future.wait([
+      final results = await Future.wait([
         AlertService.getAlerts(),
+        AlertService.getAlertTypes(), // Obtenemos los tipos de alerta
         ReadStatusManager.getReadAlertIds(),
       ]);
       
       final alerts = results[0] as List<Alertas>;
-      final readIds = results[1] as Set<String>;
+      final alertTypes = results[1] as List<AlertType>;
+      final readIds = results[2] as Set<String>;
 
       if (mounted) {
         setState(() {
           _allAlerts = alerts;
-          _readAlertIds = readIds;  
+          _alertTypes = alertTypes;
+          _readAlertIds = readIds;
+          
+          // Generar filtros dinámicamente
+          _generateFiltersFromAlerts(alerts);
           _applyFiltersAndGroup();
         });
       }
@@ -96,33 +156,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     }
   }
 
-    void _applyFiltersAndGroup() {
-    List<Alertas> filteredAlerts = _allAlerts;
 
-    if (_selectedFilterIndex != 0) {
-      final filter = _filters[_selectedFilterIndex].toLowerCase();
-      filteredAlerts = _allAlerts.where((alert) {
-        return alert.name.toLowerCase().contains(filter);
-      }).toList();
-    }
-    
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    
-    _todayAlerts = filteredAlerts.where((alert) {
-      if (alert.alertDate == null) return false;
-      final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
-      return alertDay.isAtSameMomentAs(today);
-    }).toList();
-
-    _previouslyAlerts = filteredAlerts.where((alert) {
-      if (alert.alertDate == null) return true;
-      final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
-      return !alertDay.isAtSameMomentAs(today);
-    }).toList();
-
-    setState(() {});
-  }
+ 
 
   @override
   Widget build(BuildContext context) {
@@ -212,19 +247,31 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
       ),
     );
   }
-  Widget _buildNotificationTile(Alertas alert) {
-     final alertId = ReadStatusManager.getUniqueId(alert.plate, alert.alertDate);
+   Widget _buildNotificationTile(Alertas alert) {
+    final alertId = ReadStatusManager.getUniqueId(alert.plate, alert.alertDate);
     final bool isUnread = !_readAlertIds.contains(alertId);
+
+    // Buscamos el tipo de alerta correspondiente para obtener más datos si es necesario
+    final alertType = _alertTypes.firstWhere(
+      (type) => type.name == alert.name,
+      orElse: () => AlertType(id: 0, name: alert.name),
+    );
 
     return ListTile(
       leading: CircleAvatar(
         radius: 25,
         backgroundColor: isUnread ? AppColors.primary.withOpacity(0.1) : Colors.grey.shade200,
-        child: Icon(_getIconForAlert(alert.name), color: AppColors.primary, size: 28),
+        child: Icon(_getIconForAlert(alertType.name), color: AppColors.primary, size: 28),
       ),
       title: Row(
         children: [
-          Expanded(child: Text(alert.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis)),
+          Expanded(
+            child: Text(
+              alertType.name, // Usamos el nombre del tipo de alerta
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           if (isUnread) ...[
             const SizedBox(width: 6),
             Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
@@ -247,12 +294,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     );
   }
 
-  IconData _getIconForAlert(String alertName) {
+
+   IconData _getIconForAlert(String alertName) {
     String name = alertName.toLowerCase();
     if (name.contains('velocidad')) return Icons.speed;
-    if (name.contains('combustible') || name.contains('arranque')) return Icons.local_gas_station;
-    if (name.contains('destino') || name.contains('posición')) return Icons.location_on;
-    if (name.contains('conduccion') || name.contains('descanso')) return Icons.time_to_leave;
+    if (name.contains('conduccion') || name.contains('horas') || name.contains('continua')) return Icons.time_to_leave;
+    if (name.contains('descanso')) return Icons.hotel;
+    if (name.contains('destino')) return Icons.location_on;
     return Icons.notifications; // Ícono por defecto
   }
 

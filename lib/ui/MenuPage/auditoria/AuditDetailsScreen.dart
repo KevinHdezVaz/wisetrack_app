@@ -2,12 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
  import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
- import 'package:wisetrack_app/data/models/vehicles/VehicleHistoryPoint.dart';
+import 'package:wisetrack_app/data/models/vehicles/VehicleHistoryPoint.dart';
 import 'package:wisetrack_app/data/services/vehicles_service.dart';
- import 'package:wisetrack_app/ui/MenuPage/auditoria/CustomDatePickerDialog.dart';
+import 'package:wisetrack_app/ui/MenuPage/auditoria/CustomDatePickerDialog.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 import 'package:geolocator/geolocator.dart';
+// Importamos nuestra clase de utilidades
+import 'package:wisetrack_app/utils/pdf_report_generator.dart';
 
 class AuditDetailsScreen extends StatefulWidget {
   final String plate;
@@ -251,12 +253,11 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
             children: [
               _buildDriverInfo(),
               const SizedBox(height: 16),
-             
               _buildDatePicker(context),
               const SizedBox(height: 12),
               _buildRangeDropdown(),
               const SizedBox(height: 20),
-                _buildMetricsRow(),
+              _buildMetricsRow(),
               const SizedBox(height: 16),
               if (_errorMessage != null)
                 Center(
@@ -277,7 +278,6 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
     );
   }
 
- 
   Widget _buildMetricsRow() {
     return SizedBox(
       height: 90,
@@ -310,7 +310,7 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
             const Text('Cuándo'),
             const Spacer(),
             Text(
-              DateFormat('dd / MM / yyyy', 'es_ES').format(_selectedDate),
+              DateFormat('dd / MM / yy', 'es_ES').format(_selectedDate),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
@@ -445,26 +445,43 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
       ),
     );
   }
-
-  Widget _buildDownloadButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: () {/* TODO: Lógica de descarga */},
-          icon: const Icon(Icons.download, color: Colors.white),
-          label: const Text('Descargar',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0)),
-          ),
+Widget _buildDownloadButton() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 16.0),
+    child: SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        // --- LÓGICA CORREGIDA ---
+        // El botón solo depende de si la carga ha finalizado.
+        onPressed: !_isLoading
+            ? () {
+                // Llama al método estático. Si no hay historial,
+                // enviará los valores iniciales (ej: "0 Km").
+                PdfReportGenerator.generateAuditReport(
+                  context: context,
+                  plate: widget.plate,
+                  selectedDate: _selectedDate,
+                  selectedRange: _selectedRange,
+                  distance: _distanceTraveled,
+                  avgSpeed: _averageSpeed,
+                  maxSpeed: _maxSpeed,
+                  totalTime: _totalTime,
+                );
+              }
+            : null, // Botón desactivado SÓLO mientras está cargando.
+        icon: const Icon(Icons.download, color: Colors.white),
+        label: const Text('Descargar',
+            style:
+                TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        style: ElevatedButton.styleFrom(
+          // El color también depende solo de si la carga ha finalizado.
+          backgroundColor: !_isLoading ? AppColors.primary : Colors.grey,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.0)),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

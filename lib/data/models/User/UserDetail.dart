@@ -2,10 +2,9 @@ class UserDetail {
   final String username;
   final String? name;
   final String? lastname;
-  final int? company; // Cambiado a int? para coincidir con el JSON
+  final Company? company; // Cambiado a un objeto Company
   final String? phone;
-  final List<String>
-      permission; // Cambiado a List<String> para el arreglo permission
+  final List<dynamic> permission; // Lista dinámica ya que el JSON muestra un array vacío
 
   UserDetail({
     required this.username,
@@ -18,14 +17,16 @@ class UserDetail {
 
   factory UserDetail.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>;
-
+    
     return UserDetail(
-      username: data['username'] ?? '',
-      name: data['name'],
-      lastname: data['lastname'],
-      company: data['company'], // Se mantiene como int? (puede ser null)
-      phone: data['phone'],
-      permission: List<String>.from(data['permission'] ?? []),
+      username: data['username'] as String? ?? '',
+      name: data['name'] as String?,
+      lastname: data['lastname'] as String?,
+      company: data['company'] != null 
+          ? Company.fromJson(data['company'] as Map<String, dynamic>)
+          : null,
+      phone: data['phone'] as String?,
+      permission: data['permission'] as List<dynamic>? ?? [],
     );
   }
 
@@ -34,5 +35,17 @@ class UserDetail {
     if (name == null) return lastname;
     if (lastname == null) return name;
     return '$name $lastname';
+  }
+}
+
+class Company {
+  final String name;
+
+  Company({required this.name});
+
+  factory Company.fromJson(Map<String, dynamic> json) {
+    return Company(
+      name: json['name'] as String? ?? '',
+    );
   }
 }

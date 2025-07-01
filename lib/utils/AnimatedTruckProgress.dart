@@ -18,7 +18,7 @@ class AnimatedTruckProgress extends AnimatedWidget {
     final value = animation.value;
 
     return Scaffold(
-      backgroundColor: Colors.white.withOpacity(0.8), // Fondo semi-transparente para el overlay
+      backgroundColor: Colors.white.withOpacity(0.8), 
       body: Center(
         child: Container(
           padding: const EdgeInsets.all(20),
@@ -46,7 +46,7 @@ class AnimatedTruckProgress extends AnimatedWidget {
                     child: Stack(
                       alignment: Alignment.bottomCenter,
                       children: [
-                        // Barra de progreso
+                      
                         Positioned(
                           bottom: 0,
                           child: Container(

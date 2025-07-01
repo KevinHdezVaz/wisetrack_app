@@ -76,18 +76,31 @@ class Alertas {
 }
 
 /// Modelo para el objeto anidado 'alert_type'.
+
+/// Modelo extendido para el tipo de alerta (ahora incluye id)
 class AlertType {
+  final int id;
   final String name;
 
-  AlertType({required this.name});
+  AlertType({
+    required this.id,
+    required this.name,
+  });
 
   factory AlertType.fromJson(Map<String, dynamic> json) {
     return AlertType(
+      id: json['id'] as int? ?? 0,
       name: json['name'] as String? ?? '',
     );
   }
-}
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+    };
+  }
+}
 /// Modelo para el objeto anidado 'vehicle'.
 class AlertVehicle {
   final String plate;
@@ -97,6 +110,20 @@ class AlertVehicle {
   factory AlertVehicle.fromJson(Map<String, dynamic> json) {
     return AlertVehicle(
       plate: json['plate'] as String? ?? '',
+    );
+  }
+}
+
+/// Modelo para la respuesta de tipos de alerta
+class AlertTypesResponse {
+  final List<AlertType> data;
+
+  AlertTypesResponse({required this.data});
+
+  factory AlertTypesResponse.fromJson(Map<String, dynamic> json) {
+    final list = json['data'] as List<dynamic>? ?? [];
+    return AlertTypesResponse(
+      data: list.map((item) => AlertType.fromJson(item as Map<String, dynamic>)).toList(),
     );
   }
 }

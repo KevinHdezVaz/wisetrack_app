@@ -158,50 +158,54 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
     );
   }
 
-  Widget _buildTopStatusCard(VehicleDetail vehicle) {
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shadowColor: Colors.black12,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15.0),
-        side: BorderSide(color: Colors.grey.shade300, width: 1.0),
+Widget _buildTopStatusCard(VehicleDetail vehicle) {
+  return Card(
+    color: Colors.white,
+    elevation: 2,
+    shadowColor: Colors.black12,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(15.0),
+      side: BorderSide(color: Colors.grey.shade300, width: 1.0),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildStatusItem(Icons.location_on, 'Posición', vehicle.position),
+          const SizedBox(height: 40, child: VerticalDivider()),
+          _buildStatusItem(Icons.gps_fixed, 'Conexión', vehicle.connection),
+          const SizedBox(height: 40, child: VerticalDivider()),
+          _buildStatusItem(Icons.vpn_key, 'Estado', vehicle.status),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildStatusItem(Icons.location_on, 'Posición', vehicle.position),
-            const SizedBox(height: 40, child: VerticalDivider()),
-            _buildStatusItem(Icons.gps_fixed, 'Conexión', vehicle.connection),
-            const SizedBox(height: 40, child: VerticalDivider()),
-            _buildStatusItem(Icons.vpn_key, 'Estado', vehicle.status),
-          ],
-        ),
+    ),
+  );
+}
+
+Widget _buildStatusItem(IconData icon, String title, String status) {
+  final bool isPositive = status.toLowerCase() == 'online' || 
+                         status.toLowerCase() == 'encendido' || 
+                         status.toLowerCase() == 'valida';
+  final Color statusColor = isPositive ? Colors.green.shade700 : Colors.red.shade700;
+  
+  return Column(
+    children: [
+      Icon(icon, color: statusColor, size: 28), 
+      const SizedBox(height: 8),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 4),
+          Icon(Icons.info_outline, color: Colors.grey.shade400, size: 14),
+        ],
       ),
-    );
-  }
-
-  Widget _buildStatusItem(IconData icon, String title, String status) {
-    final bool isPositive = status.toLowerCase() == 'online' || status.toLowerCase() == 'encendido' || status.toLowerCase() == 'valida';
-    return Column(
-      children: [
-        Icon(icon, color: AppColors.primaryIconos, size: 28),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Text(title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-            const SizedBox(width: 4),
-            Icon(Icons.info_outline, color: Colors.grey.shade400, size: 14),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(status, style: TextStyle(color: isPositive ? Colors.green.shade700 : Colors.red.shade700, fontWeight: FontWeight.w500)),
-      ],
-    );
-  }
-
+      const SizedBox(height: 4),
+      Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.w500)),
+    ],
+  );
+}
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),

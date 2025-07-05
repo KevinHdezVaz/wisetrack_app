@@ -135,8 +135,8 @@ class _AuditoriaScreenState extends State<AuditoriaScreen>
         return 'assets/images/icons/camion_3_4.png';
       case 'rampla_seca':
         return 'assets/images/icons/rampla_seca.png';
-      case 'liviano_frio':
-        return 'assets/images/icons/liviano_frio.png';
+      case 'rampla_fria':
+        return 'assets/images/icons/rampla_fria.png';
       case 'liviano':
         return 'assets/images/icons/liviano.png';
       case 'cama_baja':
@@ -420,11 +420,22 @@ class _AuditoriaScreenState extends State<AuditoriaScreen>
                 _statusIcon('ubi', isLocationActive),
                 _statusIcon('gps', isGpsActive),
                 _statusIcon('llave', isKeyActive),
-                // _statusIcon('shield', isShieldActive),
+            _statusIconShield('shield', isShieldActive),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+ Widget _statusIconShield(String baseName, bool isActive) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10.0),
+      child: Image.asset(
+        'assets/images/shield2.png',
+        width: 30.0,
+        height: 30.0,
       ),
     );
   }

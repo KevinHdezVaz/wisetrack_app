@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:wisetrack_app/data/models/User/UserDetail.dart';
 import 'package:wisetrack_app/data/services/UserService.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
- 
+
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
 
@@ -10,37 +12,32 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  // Controladores para los campos de texto
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _companyController;
-
-  bool _isLoading = true; // Estado para mostrar el indicador de carga
-  String? _errorMessage; // Para manejar errores
-  UserDetail? _userDetail; // Para almacenar los datos del usuario
+  File? _selectedImage;
+  bool _isLoading = true;
+  String? _errorMessage;
+  UserDetailResponse? _userDetail;
 
   @override
   void initState() {
     super.initState();
-    // Inicializamos los controladores con valores vacíos
     _nameController = TextEditingController();
     _emailController = TextEditingController();
     _companyController = TextEditingController();
-
-    // Cargar datos del usuario
     _loadUserData();
   }
 
-  // Método para cargar los datos del usuario
   Future<void> _loadUserData() async {
     try {
       final userDetail = await UserService.getUserDetail();
       if (mounted) {
         setState(() {
           _userDetail = userDetail;
-          _nameController.text = userDetail.fullName ?? '';
-          _emailController.text = userDetail.username;
-_companyController.text = userDetail.company?.name ?? 'Sin compañía';
+          _nameController.text = userDetail.data.name;
+          _emailController.text = userDetail.data.username;
+          _companyController.text = userDetail.data.company.name;
           _isLoading = false;
         });
       }
@@ -50,7 +47,6 @@ _companyController.text = userDetail.company?.name ?? 'Sin compañía';
           _errorMessage = e.toString();
           _isLoading = false;
         });
-        // Manejar sesión expirada
         if (e.toString().contains('Session expired')) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.of(context).pushReplacementNamed('/login');
@@ -60,9 +56,57 @@ _companyController.text = userDetail.company?.name ?? 'Sin compañía';
     }
   }
 
+  Future<void> _updateProfile() async {
+    if (_userDetail == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      ),
+    );
+
+    try {
+      final nameParts = _nameController.text.split(' ');
+      final firstName = nameParts.first;
+      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : null;
+
+      final updatedUser = await UserService.updateUserProfile(
+        username: _emailController.text,
+        name: firstName,
+        company: _companyController.text,
+        image: _selectedImage ?? File(_userDetail!.data.userImage),
+        lastname: lastName,
+        phone: _userDetail?.data.phone,
+      );
+
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Perfil actualizado correctamente')),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
+
+  Future<void> _pickImage() async {
+    // Implementar lógica para seleccionar imagen
+    // Ejemplo con image_picker:
+    // final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    // if (pickedFile != null) {
+    //   setState(() {
+    //     _selectedImage = File(pickedFile.path);
+    //   });
+    // }
+  }
+
   @override
   void dispose() {
-    // Desechar los controladores para liberar memoria
     _nameController.dispose();
     _emailController.dispose();
     _companyController.dispose();
@@ -76,7 +120,10 @@ _companyController.text = userDetail.company?.name ?? 'Sin compañía';
       appBar: AppBar(
         scrolledUnderElevation: 0,
         backgroundColor: Colors.white,
-        leading: _buildBackButton(context),
+        leading: IconButton(
+          icon: Image.asset('assets/images/backbtn.png', width: 40, height: 40),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text(
           'Perfil',
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
@@ -85,8 +132,7 @@ _companyController.text = userDetail.company?.name ?? 'Sin compañía';
       body: Stack(
         children: [
           _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary))
+              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
               : _errorMessage != null
                   ? Center(child: Text(_errorMessage!))
                   : ListView(
@@ -98,17 +144,14 @@ _companyController.text = userDetail.company?.name ?? 'Sin compañía';
                         const Center(
                           child: Text(
                             '38 móviles asociados',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16),
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                         ),
                         const SizedBox(height: 30),
-                        _buildTextField(
-                            label: 'Nombre', controller: _nameController),
+                        _buildTextField(label: 'Nombre', controller: _nameController),
                         const SizedBox(height: 20),
                         _buildTextField(
-                            label: 'Correo electrónico',
-                            controller: _emailController),
+                            label: 'Correo electrónico', controller: _emailController),
                         const SizedBox(height: 20),
                         _buildTextField(
                             label: 'Empresa', controller: _companyController),
@@ -120,31 +163,17 @@ _companyController.text = userDetail.company?.name ?? 'Sin compañía';
       ),
     );
   }
-
-  Widget _buildBackButton(BuildContext context) {
-    return IconButton(
-      icon: Image.asset(
-        'assets/images/backbtn.png',
-        width: 40,
-        height: 40,
-      ),
-      onPressed: () => Navigator.of(context).pop(),
-    );
-  }
-
-  Widget _buildProfilePicture() {
-    return Center(
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const CircleAvatar(
-            radius: 50,
-            backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=1'),
-            backgroundColor: Color(0xFFE6E0F8),
-          ),
-          Positioned(
-            bottom: -5,
-            right: -5,
+Widget _buildProfilePicture() {
+  return Center(
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _buildProfileImage(),
+        Positioned(
+          bottom: -5,
+          right: -5,
+          child: GestureDetector(
+            onTap: _pickImage,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.grey.shade700,
@@ -156,10 +185,41 @@ _companyController.text = userDetail.company?.name ?? 'Sin compañía';
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildProfileImage() {
+  if (_selectedImage != null) {
+    return CircleAvatar(
+      radius: 50,
+      backgroundImage: FileImage(_selectedImage!),
+      backgroundColor: const Color(0xFFE6E0F8),
     );
   }
+
+  return CircleAvatar(
+    radius: 50,
+    backgroundColor: const Color(0xFFE6E0F8),
+    child: ClipOval(
+      child: Image.network(
+        _userDetail?.data.userImage ?? 'https://i.pravatar.cc/150?img=1',
+        fit: BoxFit.cover,
+        width: 100,
+        height: 100,
+        errorBuilder: (context, error, stackTrace) {
+          return const Icon(Icons.person, size: 50, color: Colors.white);
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return const CircularProgressIndicator(color: AppColors.primary);
+        },
+      ),
+    ),
+  );
+}
 
   Widget _buildTextField(
       {required String label, required TextEditingController controller}) {
@@ -176,8 +236,7 @@ _companyController.text = userDetail.company?.name ?? 'Sin compañía';
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide(color: Colors.grey.shade300),
@@ -200,46 +259,7 @@ _companyController.text = userDetail.company?.name ?? 'Sin compañía';
         color: Colors.white,
         width: double.infinity,
         child: ElevatedButton(
-         onPressed: _isLoading ? null : () async {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) => const Center(
-      child: CircularProgressIndicator(color: AppColors.primary),
-    ),
-  );
-
-  try {
-    // Dividir nombre completo en nombre y apellido
-    final nameParts = _nameController.text.split(' ');
-    final firstName = nameParts.first;
-    final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : null;
-
-    // Crear objeto actualizado
-    final updatedUser = UserDetail(
-      username: _emailController.text,
-      name: firstName,
-      lastname: lastName,
-      company: _userDetail?.company, // Mantener la misma compañía
-      phone: _userDetail?.phone, // Mantener el mismo teléfono
-      permission: _userDetail?.permission ?? [], // Mantener mismos permisos
-    );
-
-    // TODO: Implementar UserService.updateUserDetail(updatedUser)
-    await Future.delayed(const Duration(seconds: 1)); // Simulación
-
-    Navigator.of(context).pop(); // Cerrar diálogo
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Perfil actualizado correctamente')),
-    );
-    Navigator.of(context).pop(); // Regresar
-  } catch (e) {
-    Navigator.of(context).pop(); // Cerrar diálogo
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error: ${e.toString()}')),
-    );
-  }
-},
+          onPressed: _isLoading ? null : _updateProfile,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             disabledBackgroundColor: AppColors.disabled,

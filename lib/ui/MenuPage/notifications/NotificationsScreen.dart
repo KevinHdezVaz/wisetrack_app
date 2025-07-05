@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';  
+import 'package:intl/intl.dart';
 import 'package:wisetrack_app/data/models/alert/AlertModel.dart';
-  import 'package:wisetrack_app/data/services/AlertService.dart';  
+import 'package:wisetrack_app/data/models/alert/NotificationPermissions.dart';
+import 'package:wisetrack_app/data/services/AlertService.dart';
+import 'package:wisetrack_app/data/services/NotificationsService.dart'; // Import NotificationService
 import 'package:wisetrack_app/ui/MenuPage/notifications/NotificationDetailScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 import 'package:wisetrack_app/utils/ReadStatusManager.dart';
 
- 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
 
@@ -21,28 +22,26 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
   late AnimationController _animationController;
 
   int _selectedFilterIndex = 0;
-  List<String> _filters = ['Todas']; 
+  List<String> _filters = ['Todas'];
 
-  List<AlertType> _alertTypes = []; // Lista de tipos de alerta del servicio
-
-
+  List<AlertType> _alertTypes = [];
   List<Alertas> _allAlerts = [];
   List<Alertas> _todayAlerts = [];
   List<Alertas> _previouslyAlerts = [];
   Set<String> _readAlertIds = {};
 
-   final Map<String, List<String>> _alertCategories = {
+  NotificationPermissions? _notificationPermissions; // Store notification permissions
+
+  final Map<String, List<String>> _alertCategories = {
     'Velocidad': ['Velocidad Maxima'],
     'Conducción': [
-      'Alerta conduccion 10 Horas',
-      'Alerta conduccion continua',
-      'Alerta descanso corto'
+      'conduccion 10 Horas',
+      'conduccion continua',
+      'descanso corto'
     ],
     'Destino': ['No presentación en destino'],
-    'Otros': [] 
+    'Otros': []
   };
-
-
 
   @override
   void initState() {
@@ -59,62 +58,74 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
 
   void _handleNotificationTap(Alertas alert) {
     final alertId = ReadStatusManager.getUniqueId(alert.plate, alert.alertDate);
-    
-     if (!_readAlertIds.contains(alertId)) {
+
+    if (!_readAlertIds.contains(alertId)) {
       setState(() {
         _readAlertIds.add(alertId);
       });
       ReadStatusManager.markAlertAsRead(alertId);
     }
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => NotificationDetailScreen(alert: alert)),
     );
   }
 
-void _generateFiltersFromAlerts(List<Alertas> alerts) {
-  // Primero obtenemos todos los tipos de alerta únicos que existen realmente
-  final availableTypes = alerts
-      .map((alert) => alert.alertType.name) // Usamos el nombre del tipo, no de la alerta
-      .toSet() // Eliminamos duplicados
-      .toList();
+  void _generateFiltersFromAlerts(List<Alertas> alerts) {
+    // Get unique alert types that are allowed by notification permissions
+    final availableTypes = alerts
+        .map((alert) => alert.alertType.name)
+        .toSet()
+        .where((type) => _isAlertTypeAllowed(type)) // Filter based on permissions
+        .toList();
 
-  setState(() {
-    _filters = ['Todas', ...availableTypes];
-  });
-}
-
-void _applyFiltersAndGroup() {
-  List<Alertas> filteredAlerts = _allAlerts;
-
-  if (_selectedFilterIndex != 0) {
-    final selectedType = _filters[_selectedFilterIndex];
-    filteredAlerts = _allAlerts.where((alert) {
-      // Comparamos con el nombre del tipo de alerta, no con el nombre de la alerta
-      return alert.alertType.name == selectedType;
-    }).toList();
+    setState(() {
+      _filters = ['Todas', ...availableTypes];
+    });
   }
-  
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  
-  _todayAlerts = filteredAlerts.where((alert) {
-    if (alert.alertDate == null) return false;
-    final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
-    return alertDay.isAtSameMomentAs(today);
-  }).toList();
 
-  _previouslyAlerts = filteredAlerts.where((alert) {
-    if (alert.alertDate == null) return true;
-    final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
-    return !alertDay.isAtSameMomentAs(today);
-  }).toList();
+  bool _isAlertTypeAllowed(String alertType) {
+    if (_notificationPermissions == null || !_notificationPermissions!.allowNotification) {
+      return false; // If notifications are disabled globally, no alerts are allowed
+    }
 
-  setState(() {});
-}
+    // Check if the specific alert type is enabled in permissions
+    final permissions = _notificationPermissions!.alertPermissions;
+    return permissions.maxSpeed && alertType == 'Velocidad Maxima' ||
+        permissions.shortBreak && alertType == 'descanso corto' ||
+        permissions.noArrivalAtDestination && alertType == 'No presentación en destino' ||
+        permissions.tenHoursDriving && alertType == 'conduccion 10 Horas' ||
+        permissions.continuousDriving && alertType == 'conduccion continua';
+  }
 
+  void _applyFiltersAndGroup() {
+    // Filter alerts based on notification permissions
+    List<Alertas> filteredAlerts = _allAlerts.where((alert) => _isAlertTypeAllowed(alert.alertType.name)).toList();
 
+    // Apply additional filter based on selected chip
+    if (_selectedFilterIndex != 0) {
+      final selectedType = _filters[_selectedFilterIndex];
+      filteredAlerts = filteredAlerts.where((alert) => alert.alertType.name == selectedType).toList();
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    _todayAlerts = filteredAlerts.where((alert) {
+      if (alert.alertDate == null) return false;
+      final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
+      return alertDay.isAtSameMomentAs(today);
+    }).toList();
+
+    _previouslyAlerts = filteredAlerts.where((alert) {
+      if (alert.alertDate == null) return true;
+      final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
+      return !alertDay.isAtSameMomentAs(today);
+    }).toList();
+
+    setState(() {});
+  }
 
   Future<void> _fetchInitialData() async {
     setState(() => _isLoading = true);
@@ -123,21 +134,21 @@ void _applyFiltersAndGroup() {
     try {
       final results = await Future.wait([
         AlertService.getAlerts(),
-        AlertService.getAlertTypes(), // Obtenemos los tipos de alerta
+        AlertService.getAlertTypes(),
         ReadStatusManager.getReadAlertIds(),
+        NotificationService.getNotificationPermissions(), // Fetch notification permissions
       ]);
-      
+
       final alerts = results[0] as List<Alertas>;
       final alertTypes = results[1] as List<AlertType>;
       final readIds = results[2] as Set<String>;
+      _notificationPermissions = results[3] as NotificationPermissions;
 
       if (mounted) {
         setState(() {
           _allAlerts = alerts;
           _alertTypes = alertTypes;
           _readAlertIds = readIds;
-          
-          // Generar filtros dinámicamente
           _generateFiltersFromAlerts(alerts);
           _applyFiltersAndGroup();
         });
@@ -145,7 +156,7 @@ void _applyFiltersAndGroup() {
     } catch (e) {
       if (mounted) {
         setState(() => _errorMessage = "Error al cargar notificaciones.");
-        print("Error en fetchAlerts: $e");
+        print("Error en fetchInitialData: $e");
       }
     } finally {
       if (mounted) {
@@ -155,9 +166,6 @@ void _applyFiltersAndGroup() {
       }
     }
   }
-
-
- 
 
   @override
   Widget build(BuildContext context) {
@@ -190,6 +198,11 @@ void _applyFiltersAndGroup() {
   Widget _buildBodyContent() {
     if (_errorMessage != null) {
       return Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)));
+    }
+
+    // Check if notifications are globally disabled
+    if (_notificationPermissions != null && !_notificationPermissions!.allowNotification) {
+      return const Center(child: Text('Las notificaciones están desactivadas.'));
     }
 
     if (_todayAlerts.isEmpty && _previouslyAlerts.isEmpty) {
@@ -230,7 +243,7 @@ void _applyFiltersAndGroup() {
                 if (selected) {
                   setState(() {
                     _selectedFilterIndex = index;
-                    _applyFiltersAndGroup();  
+                    _applyFiltersAndGroup();
                   });
                 }
               },
@@ -247,11 +260,11 @@ void _applyFiltersAndGroup() {
       ),
     );
   }
-   Widget _buildNotificationTile(Alertas alert) {
+
+  Widget _buildNotificationTile(Alertas alert) {
     final alertId = ReadStatusManager.getUniqueId(alert.plate, alert.alertDate);
     final bool isUnread = !_readAlertIds.contains(alertId);
 
-    // Buscamos el tipo de alerta correspondiente para obtener más datos si es necesario
     final alertType = _alertTypes.firstWhere(
       (type) => type.name == alert.name,
       orElse: () => AlertType(id: 0, name: alert.name),
@@ -267,7 +280,7 @@ void _applyFiltersAndGroup() {
         children: [
           Expanded(
             child: Text(
-              alertType.name, // Usamos el nombre del tipo de alerta
+              alertType.name,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               overflow: TextOverflow.ellipsis,
             ),
@@ -290,18 +303,17 @@ void _applyFiltersAndGroup() {
         ),
       ),
       isThreeLine: true,
-      onTap: () => _handleNotificationTap(alert), 
+      onTap: () => _handleNotificationTap(alert),
     );
   }
 
-
-   IconData _getIconForAlert(String alertName) {
+  IconData _getIconForAlert(String alertName) {
     String name = alertName.toLowerCase();
     if (name.contains('velocidad')) return Icons.speed;
     if (name.contains('conduccion') || name.contains('horas') || name.contains('continua')) return Icons.time_to_leave;
     if (name.contains('descanso')) return Icons.hotel;
     if (name.contains('destino')) return Icons.location_on;
-    return Icons.notifications; // Ícono por defecto
+    return Icons.notifications;
   }
 
   String _formatAlertDate(DateTime? date) {
@@ -312,22 +324,20 @@ void _applyFiltersAndGroup() {
     final alertDay = DateTime(date.year, date.month, date.day);
 
     if (alertDay.isAtSameMomentAs(today)) {
-      return DateFormat('HH:mm a').format(date); // '07:00 AM'
+      return DateFormat('HH:mm a').format(date);
     } else if (alertDay.isAtSameMomentAs(yesterday)) {
       return 'Ayer';
     } else {
-      return DateFormat('d MMM', 'es_ES').format(date); // '28 Abr'
+      return DateFormat('d MMM', 'es_ES').format(date);
     }
   }
-  
- 
+
   Widget _buildBackButton(BuildContext context) {
     return IconButton(
       icon: Image.asset('assets/images/backbtn.png', width: 40, height: 40),
       onPressed: () => Navigator.of(context).pop(),
     );
   }
- 
 
   Widget _buildSectionHeader(String title) {
     return Padding(
@@ -337,7 +347,6 @@ void _applyFiltersAndGroup() {
     );
   }
 
- 
   Widget _buildFooter() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24.0),
@@ -346,8 +355,7 @@ void _applyFiltersAndGroup() {
           Text('¿No encuentras más notificaciones?',
               style: TextStyle(color: Colors.grey.shade700)),
           TextButton(
-            onPressed: () {
-             },
+            onPressed: () {},
             child: const Text('Ir al historial',
                 style: TextStyle(
                     color: AppColors.primary, fontWeight: FontWeight.bold)),

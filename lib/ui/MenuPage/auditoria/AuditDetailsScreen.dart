@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
  import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:wisetrack_app/data/models/vehicles/VehicleHistoryPoint.dart';
 import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/auditoria/CustomDatePickerDialog.dart';
@@ -10,6 +13,7 @@ import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 import 'package:geolocator/geolocator.dart';
 // Importamos nuestra clase de utilidades
 import 'package:wisetrack_app/utils/pdf_report_generator.dart';
+import 'package:screenshot/screenshot.dart'; // <-- Añade esta importación
 
 class AuditDetailsScreen extends StatefulWidget {
   final String plate;
@@ -23,12 +27,20 @@ class AuditDetailsScreen extends StatefulWidget {
 class _AuditDetailsScreenState extends State<AuditDetailsScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
+    final ScreenshotController _screenshotController = ScreenshotController();
+
   bool _isLoading = true;
   String? _errorMessage;
   DateTime _selectedDate = DateTime.now();
   final List<String> _timeRanges = ['24 horas', '12 horas', '8 horas'];
   String _selectedRange = '24 horas';
   bool _isRangeDropdownOpen = false;
+  bool _isFullscreen = false; 
+
+ 
+  
+  // --- 1. NUEVA VARIABLE PARA EL PADDING DEL MAPA ---
+  EdgeInsets _mapPadding = EdgeInsets.zero;
 
   final Completer<GoogleMapController> _mapController = Completer();
   final Set<Polyline> _polylines = {};
@@ -46,6 +58,10 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
     _animationController =
         AnimationController(vsync: this, duration: const Duration(seconds: 5));
     _fetchHistory();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) => _setMapPadding());
+
+
   }
 
   @override
@@ -53,6 +69,29 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
     _animationController.dispose();
     super.dispose();
   }
+
+// --- 3. NUEVO MÉTODO PARA ESTABLECER EL PADDING ---
+void _setMapPadding() {
+  if (!mounted) return;
+
+  final screenHeight = MediaQuery.of(context).size.height;
+  final appBarHeight = AppBar().preferredSize.height; // Altura estándar del AppBar
+  final statusBarHeight = MediaQuery.of(context).padding.top; // Altura de la barra de estado
+  
+  // La altura disponible para el `Stack` (cuerpo del Scaffold)
+  final bodyHeight = screenHeight - appBarHeight - statusBarHeight;
+  
+  // Tu DraggableScrollableSheet tiene initialChildSize: 0.6
+  // por lo que ocupa el 60% de la altura del cuerpo.
+  final sheetHeight = bodyHeight * 0.6;
+
+  setState(() {
+    // Aplicamos esa altura como padding inferior. 
+    // Le restamos un poco (ej. 40) para que la ruta no quede tan pegada al borde.
+    // ¡Puedes ajustar este valor!
+    _mapPadding = EdgeInsets.only(bottom: sheetHeight - 40);
+  });
+}
 
   Future<void> _fetchHistory() async {
     setState(() {
@@ -97,49 +136,97 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
     }
   }
 
-  void _updateMapWithHistory() async {
-    if (_historyPoints.isEmpty) return;
 
-    final points =
-        _historyPoints.map((p) => LatLng(p.latitude, p.longitude)).toList();
+void _updateMapWithHistory() async {
+  if (_historyPoints.isEmpty) {
+    debugPrint("No hay puntos en _historyPoints");
+    return;
+  }
 
-    _polylines.clear();
-    _markers.clear();
+  final points = _historyPoints
+      .where((p) => p.latitude != 0.0 && p.longitude != 0.0)
+      .map((p) => LatLng(p.latitude, p.longitude))
+      .toList();
 
+  debugPrint("Puntos válidos para la polilínea: ${points.length}");
+
+  _polylines.clear();
+  if (points.length >= 2) {
     _polylines.add(
       Polyline(
         polylineId: const PolylineId('route'),
         points: points,
         color: AppColors.primary,
         width: 5,
+        geodesic: true,
       ),
     );
-
-    _markers.add(Marker(
-        markerId: const MarkerId('start'),
-        position: points.first,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen)));
-    _markers.add(Marker(
-        markerId: const MarkerId('end'),
-        position: points.last,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed)));
-
-    if (_mapController.isCompleted) {
-      final GoogleMapController controller = await _mapController.future;
-      controller.animateCamera(CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(
-              points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b),
-              points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b)),
-          northeast: LatLng(
-              points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b),
-              points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b)),
-        ),
-        50.0,
-      ));
-    }
-    setState(() {});
   }
+
+  _markers.clear();
+
+  if (points.isNotEmpty) {
+    BitmapDescriptor customIcon = await BitmapDescriptor.fromAssetImage(
+      const ImageConfiguration(size: Size(48, 48)),
+      'assets/images/truck_check.png',
+    );
+
+    // --- BUENA PRÁCTICA ---
+    // Si el widget fue eliminado mientras se cargaba la imagen, no continúes.
+    if (!mounted) return;
+
+    _markers.add(Marker(
+      markerId: const MarkerId('start'),
+      position: points.first,
+      icon: customIcon,
+      infoWindow: InfoWindow(
+        title: 'Inicio',
+        snippet: 'Velocidad: ${_historyPoints.first.speed} km/h',
+      ),
+    ));
+
+
+    // Ajustar la cámara para mostrar toda la ruta
+    if (_mapController.isCompleted) {
+      final controller = await _mapController.future;
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (points.length > 1) {
+        controller.animateCamera(
+          CameraUpdate.newLatLngBounds(
+            _boundsFromLatLngList(points),
+            60.0, // Padding
+          ),
+        );
+      } else if (points.isNotEmpty) {
+        controller.animateCamera(
+          CameraUpdate.newLatLngZoom(points.first, 16),
+        );
+      }
+    }
+  }
+
+  setState(() {});
+}
+  
+// Helper para calcular los límites del mapa
+LatLngBounds _boundsFromLatLngList(List<LatLng> list) {
+  double? x0, x1, y0, y1;
+  for (LatLng latLng in list) {
+    if (x0 == null) {
+      x0 = x1 = latLng.latitude;
+      y0 = y1 = latLng.longitude;
+    } else {
+      if (latLng.latitude > x1!) x1 = latLng.latitude;
+      if (latLng.latitude < x0) x0 = latLng.latitude;
+      if (latLng.longitude > y1!) y1 = latLng.longitude;
+      if (latLng.longitude < y0!) y0 = latLng.longitude;
+    }
+  }
+  return LatLngBounds(
+    northeast: LatLng(x1!, y1!),
+    southwest: LatLng(x0!, y0!),
+  );
+}
 
   void _calculateAndSetMetrics() {
     if (_historyPoints.length < 2) {
@@ -212,28 +299,93 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
             style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition:
-                const CameraPosition(target: LatLng(-33.045, -71.619), zoom: 13.0),
-            polylines: _polylines,
-            markers: _markers,
-            zoomControlsEnabled: false,
-            onMapCreated: (controller) {
-              if (!_mapController.isCompleted) {
-                _mapController.complete(controller);
-              }
-            },
+    body: Stack(
+  children: [
+    Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition:
+              const CameraPosition(target: LatLng(-33.045, -71.619), zoom: 13.0),
+          polylines: _polylines,
+          markers: _markers,
+          padding: _mapPadding,
+          zoomControlsEnabled: false,
+          onMapCreated: (controller) {
+            if (!_mapController.isCompleted) {
+              _mapController.complete(controller);
+            }
+          },
+        ),
+        // Mensaje de "No hay datos de ruta" cuando no hay puntos, no está cargando y no hay error
+        if (!_isLoading && _historyPoints.isEmpty && _errorMessage == null)
+          Positioned.fill(
+            child:   Container(
+              color: Colors.black.withOpacity(0.6), // Fondo semi-transparente
+              child:   const Padding(
+                padding: EdgeInsets.symmetric(vertical: 100, horizontal: 100),
+                child: Text(
+                  'No hay datos de ruta',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    shadows: [
+                      Shadow(
+                        blurRadius: 4.0,
+                        color: Colors.black54,
+                        offset: Offset(2.0, 2.0),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-          if (!_isLoading) _buildContentSheet(),
-          if (_isLoading)
-            Positioned.fill(
-                child: AnimatedTruckProgress(animation: _animationController)),
-        ],
+      ],
+    ),
+    if (!_isLoading && !_isFullscreen) _buildContentSheet(),
+    _buildFullscreenButton(),
+    if (_isLoading)
+      Positioned.fill(
+        child: AnimatedTruckProgress(animation: _animationController),
       ),
+  ],
+),
     );
   }
+
+  Widget _buildFullscreenButton() {
+  // Usamos Positioned para colocarlo donde queramos dentro del Stack
+  return Positioned(
+    top: 20.0,  // Distancia desde arriba
+    right: 16.0, // Distancia desde la derecha
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 5)
+        ],
+      ),
+      child: IconButton(
+        icon: Image.asset(
+          _isFullscreen 
+            ? 'assets/images/fullscreen_off.png' // Opcional: un ícono para salir
+            : 'assets/images/fullscreen.png',
+          width: 24,
+          height: 24,
+        ),
+        onPressed: () {
+          setState(() {
+            _isFullscreen = !_isFullscreen;
+          });
+        },
+        tooltip: _isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa',
+      ),
+    ),
+  );
+}
+
 
   Widget _buildContentSheet() {
     return DraggableScrollableSheet(
@@ -241,37 +393,40 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
       minChildSize: 0.2,
       maxChildSize: 0.9,
       builder: (BuildContext context, ScrollController scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20.0)),
-            boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black12)],
-          ),
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
-            children: [
-              _buildDriverInfo(),
-              const SizedBox(height: 16),
-              _buildDatePicker(context),
-              const SizedBox(height: 12),
-              _buildRangeDropdown(),
-              const SizedBox(height: 20),
-              _buildMetricsRow(),
-              const SizedBox(height: 16),
-              if (_errorMessage != null)
-                Center(
-                    child: Text(_errorMessage!,
-                        style: const TextStyle(color: Colors.red))),
-              if (!_isLoading && _historyPoints.isEmpty && _errorMessage == null)
-                const Center(
-                    child: Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Text(
-                      'No se encontraron recorridos para la fecha y rango seleccionados.'),
-                )),
-              _buildDownloadButton(),
-            ],
+        return Screenshot(
+          controller: _screenshotController,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20.0)),
+              boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black12)],
+            ),
+            child: ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
+              children: [
+                _buildDriverInfo(),
+                const SizedBox(height: 16),
+                _buildDatePicker(context),
+                const SizedBox(height: 12),
+                _buildRangeDropdown(),
+                const SizedBox(height: 20),
+                _buildMetricsRow(),
+                const SizedBox(height: 16),
+                if (_errorMessage != null)
+                  Center(
+                      child: Text(_errorMessage!,
+                          style: const TextStyle(color: Colors.red))),
+                if (!_isLoading && _historyPoints.isEmpty && _errorMessage == null)
+                  const Center(
+                      child: Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Text(
+                        'No se encontraron recorridos para la fecha y rango seleccionados.'),
+                  )),
+                _buildDownloadButton(),
+              ],
+            ),
           ),
         );
       },
@@ -451,30 +606,77 @@ Widget _buildDownloadButton() {
     child: SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        // --- LÓGICA CORREGIDA ---
-        // El botón solo depende de si la carga ha finalizado.
         onPressed: !_isLoading
-            ? () {
-                // Llama al método estático. Si no hay historial,
-                // enviará los valores iniciales (ej: "0 Km").
-                PdfReportGenerator.generateAuditReport(
-                  context: context,
-                  plate: widget.plate,
-                  selectedDate: _selectedDate,
-                  selectedRange: _selectedRange,
-                  distance: _distanceTraveled,
-                  avgSpeed: _averageSpeed,
-                  maxSpeed: _maxSpeed,
-                  totalTime: _totalTime,
+            ? () async {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Generando reporte PDF...')),
                 );
+
+                try {
+                  await Future.delayed(const Duration(milliseconds: 1000));
+
+                  final controller = await _mapController.future;
+                  await controller.animateCamera(CameraUpdate.zoomTo(13.0));
+
+                  final List<dynamic> results = await Future.wait([
+                    controller.takeSnapshot(),
+                    _screenshotController.capture(),
+                  ]);
+
+                  final mapImageBytes = results[0] as Uint8List?;
+                  final panelImageBytes = results[1] as Uint8List?;
+
+                  print('--- INICIO DIAGNÓSTICO DE CAPTURA ---');
+                  print('Captura del mapa: ${mapImageBytes != null ? "${mapImageBytes.lengthInBytes} bytes" : "NULO"}');
+                  print('Captura del panel: ${panelImageBytes != null ? "${panelImageBytes.lengthInBytes} bytes" : "NULO"}');
+
+                  if (mapImageBytes != null) {
+                    final mapFile = File('${(await getTemporaryDirectory()).path}/map_snapshot.png');
+                    await mapFile.writeAsBytes(mapImageBytes);
+                    print('Mapa guardado en: ${mapFile.path}');
+                  }
+                  if (panelImageBytes != null) {
+                    final panelFile = File('${(await getTemporaryDirectory()).path}/panel_snapshot.png');
+                    await panelFile.writeAsBytes(panelImageBytes);
+                    print('Panel guardado en: ${panelFile.path}');
+                  }
+
+                  if (mapImageBytes == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(backgroundColor: Colors.red, content: Text('Error: No se pudo capturar el mapa.')),
+                    );
+                    return;
+                  }
+
+                  if (panelImageBytes == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(backgroundColor: Colors.red, content: Text('Error: No se pudo capturar el panel de datos.')),
+                    );
+                    return;
+                  }
+
+                  await PdfReportGenerator.generateVisualReport(
+                    mapImage: mapImageBytes,
+                    panelImage: panelImageBytes,
+                    plate: widget.plate,
+                  );
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('PDF generado exitosamente')),
+                  );
+                } catch (e, stackTrace) {
+                  print('Error durante la captura o generación del PDF: $e');
+                  print('StackTrace: $stackTrace');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(backgroundColor: Colors.red, content: Text('Error: $e')),
+                  );
+                }
               }
-            : null, // Botón desactivado SÓLO mientras está cargando.
+            : null,
         icon: const Icon(Icons.download, color: Colors.white),
         label: const Text('Descargar',
-            style:
-                TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         style: ElevatedButton.styleFrom(
-          // El color también depende solo de si la carga ha finalizado.
           backgroundColor: !_isLoading ? AppColors.primary : Colors.grey,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(

@@ -17,7 +17,7 @@ dependencies:
 
   # Widgets y Utilidades
   pinput: ^4.0.0
-  google_maps_flutter: ^2.5.0
+  google_maps_flutter: ^2.10.1
   dropdown_button2: ^2.3.9
   intl: ^0.19.0 # Se actualizó a la versión más reciente
   table_calendar: ^3.1.1 # Se actualizó a la versión más reciente
@@ -34,6 +34,7 @@ dependencies:
   share_plus: ^7.0.0     # Para Share en iOS
   open_file_plus: ^3.4.1+1
   image: ^4.5.4
+
 
 
 dev_dependencies:

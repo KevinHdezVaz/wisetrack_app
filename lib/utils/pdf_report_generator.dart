@@ -11,12 +11,82 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:wisetrack_app/data/models/BarChartDataModel.dart';
 import 'package:wisetrack_app/data/models/dashboard/DashboardDetailModel.dart';
 import 'package:wisetrack_app/data/models/vehicles/VehicleHistoryPoint.dart'; // Asegúrate de que esta importación sea correcta
-
+import 'package:image/image.dart' as img; // Importa el paquete image
 /// Una clase de utilidad para generar diferentes tipos de reportes en PDF.
 class PdfReportGenerator {
-  // =======================================================================
-  // =========== FUNCIÓN CLAVE PARA CARGAR LAS FUENTES Y EL TEMA ===========
-  // =======================================================================
+  static Future<void> generateVisualReport({
+    required Uint8List mapImage,
+    required Uint8List panelImage,
+    required String plate,
+  }) async {
+    try {
+      final pdf = pw.Document();
+      final pdfTheme = await _getPdfTheme();
+
+      // Función para redimensionar imágenes
+      Uint8List resizeImage(Uint8List input, {int maxWidth = 800}) {
+        final image = img.decodeImage(input);
+        if (image == null) {
+          debugPrint("Error: No se pudo decodificar la imagen");
+          return input; // Devuelve la imagen original si falla
+        }
+        final resized = img.copyResize(image, width: maxWidth, interpolation: img.Interpolation.linear);
+        return Uint8List.fromList(img.encodePng(resized));
+      }
+
+      // Redimensionar las imágenes capturadas
+      final resizedMapImage = resizeImage(mapImage, maxWidth: 800);
+      final resizedPanelImage = resizeImage(panelImage, maxWidth: 800);
+
+      final mapPdfImage = pw.MemoryImage(resizedMapImage);
+      final panelPdfImage = pw.MemoryImage(resizedPanelImage);
+
+      print('--- INICIO DIAGNÓSTICO PDF ---');
+      print('Bytes de imagen del mapa (redimensionada): ${resizedMapImage.lengthInBytes}');
+      print('Bytes de imagen del panel (redimensionada): ${resizedPanelImage.lengthInBytes}');
+      print('Creando PDF para patente: $plate');
+
+      pdf.addPage(
+        pw.Page(
+          theme: pdfTheme,
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Column(
+              children: [
+                pw.Text(
+                  'Reporte de Auditoría - Patente: $plate',
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+                pw.Image(mapPdfImage, fit: pw.BoxFit.contain),
+                pw.SizedBox(height: 10),
+                pw.Image(panelPdfImage, fit: pw.BoxFit.contain),
+              ],
+            );
+          },
+        ),
+      );
+
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/reporte_$plate.pdf');
+      final pdfBytes = await pdf.save();
+      print('PDF generado, tamaño: ${pdfBytes.lengthInBytes} bytes');
+      await file.writeAsBytes(pdfBytes);
+
+      final result = await OpenFile.open(file.path);
+      print('Resultado de abrir PDF: ${result.type}, mensaje: ${result.message}');
+    } catch (e, stackTrace) {
+      debugPrint("Error al generar o abrir el PDF: $e");
+      debugPrint("StackTrace: $stackTrace");
+      throw e;
+    }
+  }
+
+ 
+  
   static Future<pw.ThemeData> _getPdfTheme() async {
     // Cargamos los bytes de las fuentes desde los assets que ya añadiste
     final fontData = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");

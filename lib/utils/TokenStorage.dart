@@ -12,6 +12,15 @@ class TokenStorage {
     }
   }
 
+    static Future<Map<String, String>> _getAuthHeaders() async {
+    final token = await TokenStorage.getToken();
+    return {
+      'Authorization': 'Token $token',
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+  }
+
   static Future<String?> getToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();

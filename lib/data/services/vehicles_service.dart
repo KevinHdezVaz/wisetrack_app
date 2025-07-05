@@ -221,7 +221,7 @@ static Future<List<VehicleType>> getVehicleTypes() async {
     final formattedEndDate = DateFormat('yyyy-MM-dd HH:mm').format(endDate);
     final url = Uri.parse('${Constants.baseUrl}/vehicle/get-history/$formattedEndDate/$rangeInHours');
 
-    debugPrint('VehicleService: Realizando GET a: $url con body: {"plate": "$plate"}');
+    debugPrint('VehicleService: Realizando GET a: $url');
     
     try {
       // Se construye la petición manualmente para poder enviar un GET con body.

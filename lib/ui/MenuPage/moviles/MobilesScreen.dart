@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
  import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/FilterBottomSheet.dart';
+import 'package:wisetrack_app/ui/MenuPage/moviles/SecurityActionsScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/VehicleDetailScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/data/models/vehicles/Vehicle.dart';
@@ -445,7 +446,22 @@ class _MobilesScreenState extends State<MobilesScreen>
                 _statusIcon('ubi', isLocationActive),
                 _statusIcon('gps', isGpsActive),
                 _statusIcon('llave', isKeyActive),
-                _statusIconShield('shield', isShieldActive),
+                GestureDetector(
+                    onTap: () {
+                      // Oculta el teclado y la lista para una transición limpia.
+                     // _searchFocusNode.unfocus();
+                      // Navega a la pantalla de seguridad, pasando la patente.
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SecurityActionsScreen(
+                            plate: vehicle.plate,
+                          ),
+                        ),
+                      );
+                    },
+                    child: _statusIconShield('shield', isShieldActive),
+                  ),
               ],
             ),
           ],

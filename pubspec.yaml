@@ -34,6 +34,8 @@ dependencies:
   share_plus: ^7.0.0     # Para Share en iOS
   open_file_plus: ^3.4.1+1
   image: ^4.5.4
+  geocoding: ^3.0.0 # O la versión más reciente
+  printing: ^5.6.0
 
 
 

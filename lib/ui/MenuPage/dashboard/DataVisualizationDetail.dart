@@ -8,8 +8,8 @@ import 'package:wisetrack_app/data/models/dashboard/DashboardDetailModel.dart';
 import 'package:wisetrack_app/data/services/DashboardService.dart';
 import 'package:wisetrack_app/ui/MenuPage/auditoria/CustomDatePickerDialog.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
-// Importamos nuestra nueva clase de utilidades
 import 'package:wisetrack_app/utils/pdf_report_generator.dart';
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class DataVisualizationDetail extends StatefulWidget {
   final String title;
@@ -25,14 +25,27 @@ class DataVisualizationDetail extends StatefulWidget {
   _DataVisualizationDetailState createState() => _DataVisualizationDetailState();
 }
 
-class _DataVisualizationDetailState extends State<DataVisualizationDetail> {
+class _DataVisualizationDetailState extends State<DataVisualizationDetail>
+    with SingleTickerProviderStateMixin {
   DateTime _selectedDate = DateTime.now();
   Future<DashboardDetailData>? _detailDataFuture;
+  bool _isLoading = false;
+  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
     _fetchDetails();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   void _fetchDetails() {
@@ -62,6 +75,36 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail> {
     }
   }
 
+  Future<void> _generatePdfReport(DashboardDetailData data) async {
+    setState(() {
+      _isLoading = true;
+    });
+    _animationController.repeat();
+
+    try {
+      await PdfReportGenerator.generateBarChartReport(
+        context: context,
+        reportTitle: widget.title,
+        reportData: data,
+        colorResolver: _getColorForDataType,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al generar el PDF: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _animationController.stop();
+        _animationController.reset();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -81,20 +124,30 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail> {
           ],
         ),
       ),
-      body: FutureBuilder<DashboardDetailData>(
-        future: _detailDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
-          }
-          if (snapshot.hasData) {
-            return _buildContent(snapshot.data!);
-          }
-          return const Center(child: Text("No hay datos disponibles."));
-        },
+      body: Stack(
+        children: [
+          FutureBuilder<DashboardDetailData>(
+            future: _detailDataFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text("Error: ${snapshot.error}"));
+              }
+              if (snapshot.hasData) {
+                return _buildContent(snapshot.data!);
+              }
+              return const Center(child: Text("No hay datos disponibles."));
+            },
+          ),
+          if (_isLoading)
+            Center(
+              child: AnimatedTruckProgress(
+                animation: _animationController,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -127,20 +180,12 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail> {
             ),
           ),
         ),
-        _buildDownloadButton(),
+        _buildDownloadButton(detailData),
       ],
     );
   }
 
-  // YA NO NECESITAMOS LA FUNCIÓN _generateAndOpenPdf AQUÍ
-
-  // =======================================================================
-  // =========== WIDGETS Y LÓGICA AUXILIAR DE LA PANTALLA ==================
-  // =======================================================================
-
   Color _getColorForDataType(String key) {
-    // Esta función se queda aquí, porque es lógica específica de esta pantalla.
-    // Se la pasaremos a nuestro generador de PDF.
     switch (widget.dataType) {
       case 'd_vehicles_status':
         switch (key) {
@@ -182,7 +227,8 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail> {
             const SizedBox(width: 12),
             const Text('Cuándo', style: TextStyle(fontWeight: FontWeight.bold)),
             const Spacer(),
-            Text(DateFormat('dd / MM / yy', 'es_ES').format(_selectedDate), style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(DateFormat('dd / MM / yy', 'es_ES').format(_selectedDate),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -315,34 +361,21 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail> {
     );
   }
 
-  Widget _buildDownloadButton() {
+  Widget _buildDownloadButton(DashboardDetailData data) {
     return Align(
       alignment: Alignment.bottomCenter,
       child: Container(
         padding: const EdgeInsets.all(16.0),
         width: double.infinity,
-        child: FutureBuilder<DashboardDetailData>(
-          future: _detailDataFuture,
-          builder: (context, snapshot) {
-            final bool hasData = snapshot.hasData && snapshot.connectionState == ConnectionState.done;
-            return ElevatedButton.icon(
-              onPressed: hasData
-                  ? () => PdfReportGenerator.generateBarChartReport(
-                        context: context,
-                        reportTitle: widget.title,
-                        reportData: snapshot.data!,
-                        colorResolver: _getColorForDataType, // Le pasamos la función de color
-                      )
-                  : null,
-              icon: const Icon(Icons.download, color: Colors.white),
-              label: const Text('Descargar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: hasData ? AppColors.primary : Colors.grey,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-              ),
-            );
-          },
+        child: ElevatedButton.icon(
+          onPressed: _isLoading ? null : () => _generatePdfReport(data),
+          icon: const Icon(Icons.download, color: Colors.white),
+          label: const Text('Descargar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _isLoading ? Colors.grey : AppColors.primary,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+          ),
         ),
       ),
     );

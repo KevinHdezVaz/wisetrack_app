@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:wisetrack_app/data/models/vehicles/Vehicle.dart';
+import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 
 class FilterBottomSheet extends StatefulWidget {
@@ -13,13 +15,41 @@ class FilterBottomSheet extends StatefulWidget {
 }
 
 class _FilterBottomSheetState extends State<FilterBottomSheet> {
-  // Ahora inicializamos _selectedFilters con los filtros pasados
+  // Filtros seleccionados por el usuario
   late Set<String> _selectedFilters;
+
+  // --- INICIO: Estado para manejar la carga de datos ---
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<VehicleType> _vehicleTypes = [];
+  // --- FIN: Estado para manejar la carga de datos ---
 
   @override
   void initState() {
     super.initState();
     _selectedFilters = Set.from(widget.initialFilters);
+    // Llama al método para obtener los datos cuando el widget se inicializa
+    _fetchVehicleTypes();
+  }
+
+  /// Obtiene los tipos de vehículo desde el servicio y actualiza el estado.
+  Future<void> _fetchVehicleTypes() async {
+    try {
+      final types = await VehicleService.getVehicleTypes();
+      if (mounted) {
+        setState(() {
+          _vehicleTypes = types;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = "Error al cargar tipos de vehículo.";
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _handleSelection(String label) {
@@ -34,7 +64,6 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // Asegurarse de que el bottom sheet no se solape con el teclado
     return Padding(
       padding:
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -57,20 +86,14 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                           fontWeight: FontWeight.bold, fontSize: 18.0)),
                   IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(
-                        context), // Cierra sin aplicar si se cierra con la X
+                    onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
               const SizedBox(height: 12.0),
-              _buildFilterSection('Tipo de vehículo', [
-                'Tracto',
-                'Rampla seca',
-                'Camión 3/4',
-                'Liviano',
-                'Rampla fría',
-                'Cama baja'
-              ]),
+              // --- INICIO: Construcción dinámica de la sección de filtros ---
+              _buildVehicleTypeSection(),
+              // --- FIN: Construcción dinámica ---
               _buildFilterSection('Posición', ['Válida', 'Inválida']),
               _buildFilterSection('Conexión', ['Online', 'Offline']),
               _buildFilterSection('Estado de motor', ['Encendido', 'Apagado']),
@@ -83,8 +106,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   OutlinedButton(
-                    onPressed: () => Navigator.pop(context,
-                        <String>{}), // Devuelve un Set vacío para borrar
+                    onPressed: () => Navigator.pop(context, <String>{}),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: AppColors.primary),
                       shape: RoundedRectangleBorder(
@@ -97,8 +119,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                             color: AppColors.primary, fontSize: 14.0)),
                   ),
                   ElevatedButton(
-                    onPressed: () => Navigator.pop(context,
-                        _selectedFilters), // Devuelve los filtros seleccionados
+                    onPressed: () => Navigator.pop(context, _selectedFilters),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       shape: RoundedRectangleBorder(
@@ -120,6 +141,23 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
         ),
       ),
     );
+  }
+
+  /// Widget que decide si mostrar un indicador de carga, un error o la lista de filtros.
+  Widget _buildVehicleTypeSection() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary,));
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+          child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)));
+    }
+
+    // Si todo va bien, crea la lista de nombres a partir de los datos obtenidos.
+    final typeNames = _vehicleTypes.map((type) => type.name).toList();
+
+    return _buildFilterSection('Tipo de vehículo', typeNames);
   }
 
   Widget _buildFilterSection(String title, List<String> options) {

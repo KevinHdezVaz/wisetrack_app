@@ -14,6 +14,68 @@ import 'package:wisetrack_app/data/models/vehicles/VehicleHistoryPoint.dart'; //
 import 'package:image/image.dart' as img; // Importa el paquete image
 /// Una clase de utilidad para generar diferentes tipos de reportes en PDF.
 class PdfReportGenerator {
+
+
+
+  // --- NUEVO MÉTODO PARA EL REPORTE DE PANTALLA COMPLETA ---
+  static Future<void> generateFullScreenReport({
+    required Uint8List screenImage,
+    required String plate,
+  }) async {
+    try {
+      final pdf = pw.Document();
+      final pdfTheme = await _getPdfTheme();
+
+      // Redimensionamos la imagen para que no sea excesivamente grande en el PDF
+      final image = img.decodeImage(screenImage);
+      if (image == null) throw Exception("No se pudo decodificar la imagen de la pantalla.");
+      
+      final resizedImage = img.copyResize(image, width: 1000, interpolation: img.Interpolation.linear);
+      final pdfImage = pw.MemoryImage(Uint8List.fromList(img.encodePng(resizedImage)));
+
+      pdf.addPage(
+        pw.Page(
+          theme: pdfTheme,
+          pageFormat: PdfPageFormat.a4.landscape, // Usamos formato horizontal para que quepa mejor
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Reporte de Auditoría - Patente: $plate',
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 5),
+                pw.Text(
+                  'Fecha de generación: ${DateFormat('dd/MM/yyyy HH:mm', 'es_ES').format(DateTime.now())}',
+                  style: const pw.TextStyle(color: PdfColors.grey)
+                ),
+                pw.SizedBox(height: 20),
+                // Añadimos la imagen de la pantalla completa
+                pw.Image(pdfImage, fit: pw.BoxFit.contain),
+              ],
+            );
+          },
+        ),
+      );
+
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/reporte_auditoria_$plate.pdf');
+      await file.writeAsBytes(await pdf.save());
+
+      await OpenFile.open(file.path);
+
+    } catch (e) {
+      debugPrint("Error al generar el reporte de pantalla completa: $e");
+      rethrow; // Relanzamos el error para que sea capturado en la UI
+    }
+  }
+
+
+
   static Future<void> generateVisualReport({
     required Uint8List mapImage,
     required Uint8List panelImage,
@@ -106,64 +168,191 @@ class PdfReportGenerator {
   // =======================================================================
   // =========== MÉTODO PARA REPORTE DE GRÁFICA (ACTUALIZADO) ==============
   // =======================================================================
-  static Future<void> generateBarChartReport({
-    required BuildContext context,
-    required String reportTitle,
-    required DashboardDetailData reportData,
-    required Color Function(String) colorResolver,
-  }) async {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Generando PDF...')),
-    );
+ static Future<void> generateBarChartReport({
+  required BuildContext context,
+  required String reportTitle,
+  required DashboardDetailData reportData,
+  required Color Function(String) colorResolver,
+}) async {
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Generando PDF...')),
+  );
 
-    try {
-      final pdf = pw.Document();
-      // ¡Paso clave! Cargamos el tema con las fuentes ANTES de crear la página
-      final pdfTheme = await _getPdfTheme();
+  try {
+    final pdf = pw.Document();
+    final pdfTheme = await _getPdfTheme();
+    
+    // Cargar el logo
+           final logoBytes = await rootBundle.load('assets/images/fondoapp.jpg');
 
-      final chartData = reportData.breakdown.entries.map((entry) {
-        return BarChartDataModel(
-          label: entry.key.replaceAll('_', ' ').replaceAll(' > 1 hora', ''),
-          value: entry.value.toDouble(),
-          color: colorResolver(entry.key),
-        );
-      }).toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
+    final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
 
-      final maxValue = reportData.breakdown.values.isEmpty
-          ? 1.0
-          : reportData.breakdown.values.reduce(max).toDouble();
+    final chartData = reportData.breakdown.entries.map((entry) {
+      return BarChartDataModel(
+        label: entry.key.replaceAll('_', ' ').replaceAll(' > 1 hora', ''),
+        value: entry.value.toDouble(),
+        color: colorResolver(entry.key),
+      );
+    }).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
-      pdf.addPage(
-        pw.Page(
-          theme: pdfTheme, // <-- APLICAMOS EL TEMA A LA PÁGINA
-          pageFormat: PdfPageFormat.a4,
-          build: (pw.Context pdfContext) {
-            return _buildBarChartPdfPage(
-                context: pdfContext,
-                title: reportTitle,
+    final maxValue = reportData.breakdown.values.isEmpty
+        ? 1.0
+        : reportData.breakdown.values.reduce(max).toDouble();
+
+    pdf.addPage(
+      pw.Page(
+        theme: pdfTheme,
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context pdfContext) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Header con logo
+              _buildPdfHeader(logoImage, reportTitle),
+              
+              pw.SizedBox(height: 15),
+              
+              // Contenido del reporte
+              _buildBarChartContent(
                 chartData: chartData,
                 maxValue: maxValue,
-                totalValue: reportData.total.toString());
-          },
-        ),
-      );
+                totalValue: reportData.total.toString(),
+              ),
+              
+              // Footer
+              pw.SizedBox(height: 20),
+              _buildPdfFooter(),
+            ],
+          );
+        },
+      ),
+    );
 
-      final Uint8List pdfBytes = await pdf.save();
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = 'Reporte_${reportTitle.replaceAll(' ', '_')}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
-      final file = File('${directory.path}/$fileName');
-      await file.writeAsBytes(pdfBytes);
+    final Uint8List pdfBytes = await pdf.save();
+    final directory = await getApplicationDocumentsDirectory();
+    final fileName = 'Reporte_${reportTitle.replaceAll(' ', '_')}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
+    final file = File('${directory.path}/$fileName');
+    await file.writeAsBytes(pdfBytes);
 
-      await OpenFile.open(file.path);
-    } catch (e) {
-      debugPrint('Error en generateBarChartReport: $e');
-      if(context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al crear PDF: $e')));
-      }
+    await OpenFile.open(file.path);
+  } catch (e) {
+    debugPrint('Error en generateBarChartReport: $e');
+    if(context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al crear PDF: $e')));
     }
   }
+}
+
+static pw.Widget _buildPdfHeader(pw.ImageProvider logoImage, String title) {
+  return pw.Row(
+    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+    children: [
+      pw.Image(logoImage, height: 40),
+      pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          pw.Text('Reporte de Auditoría',
+              style: const pw.TextStyle(
+                  fontSize: 16,
+                  color: PdfColors.blue800)),
+          pw.Text(title,
+              style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold)),
+        ],
+      ),
+    ],
+  );
+}
+
+static pw.Widget _buildBarChartContent({
+  required List<BarChartDataModel> chartData,
+  required double maxValue,
+  required String totalValue,
+}) {
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text('Fecha: ${DateFormat('dd/MM/yyyy', 'es_ES').format(DateTime.now())}',
+              style: const pw.TextStyle(fontSize: 10)),
+          pw.Text('Generado a las: ${DateFormat('HH:mm', 'es_ES').format(DateTime.now())}',
+              style: const pw.TextStyle(fontSize: 10)),
+        ],
+      ),
+      
+      pw.Divider(height: 20),
+      
+      // Gráfico de barras
+      pw.ListView(
+        children: chartData.map((item) {
+          final barWidthFraction = maxValue > 0 ? (item.value / maxValue) : 0.0;
+          return pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 6),
+            child: pw.Row(
+              children: [
+                pw.SizedBox(
+                  width: 100,
+                  child: pw.Text(item.label,
+                      textAlign: pw.TextAlign.right,
+                      style: const pw.TextStyle(fontSize: 10))),
+                pw.SizedBox(width: 10),
+                pw.Expanded(
+                  child: pw.ClipRRect(
+                    horizontalRadius: 3,
+                    verticalRadius: 3,
+                    child: pw.LinearProgressIndicator(
+                      value: barWidthFraction,
+                      backgroundColor: PdfColors.grey200,
+                      valueColor: PdfColor.fromInt(item.color.value),
+                      minHeight: 14,
+                    ),
+                  ),
+                ),
+                pw.SizedBox(width: 10),
+                pw.Text(item.value.toInt().toString(),
+                    style: const pw.TextStyle(fontSize: 10)),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+      
+      pw.Divider(height: 20),
+      
+      // Total
+      pw.Center(
+        child: pw.Container(
+          padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+          decoration: pw.BoxDecoration(
+            color: PdfColors.blue50,
+            borderRadius: pw.BorderRadius.circular(20),
+          ),
+          child: pw.Text('Total: $totalValue',
+              style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blue800)),
+        ),
+      ),
+    ],
+  );
+}
+
+static pw.Widget _buildPdfFooter() {
+  return pw.Column(
+    children: [
+      pw.Divider(),
+      pw.Text('Wisetrack',
+          style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+       
+    ],
+  );
+}
 
   // =======================================================================
   // =========== MÉTODO PARA REPORTE DE AUDITORÍA (ACTUALIZADO) ============

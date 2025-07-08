@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:wisetrack_app/data/models/dashboard/BalanceResponse.dart';
 import 'package:wisetrack_app/data/models/dashboard/DashboardData.dart'; // Importa el nuevo modelo
 import 'package:wisetrack_app/data/models/dashboard/DashboardDetailModel.dart';
 import 'package:wisetrack_app/utils/TokenStorage.dart';
@@ -19,10 +20,41 @@ class DashboardService {
     };
   }
 
-   /// Obtiene los datos detallados para una categoría específica del dashboard.
-  static Future<DashboardDetailData> getDashboardDetailData({
+
+/// Obtiene los datos de balance del usuario
+  static Future<BalanceResponse> getUserBalance() async {
+    final url = Uri.parse('${Constants.baseUrl}/user/get-balance');
+    
+    debugPrint('BalanceService: Realizando GET a: $url');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: await _getAuthHeaders(),
+      );
+
+      debugPrint('BalanceService: Respuesta GET ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        // Decodificamos como UTF-8 para manejar acentos y caracteres especiales
+        final String responseBody = utf8.decode(response.bodyBytes);
+        final Map<String, dynamic> jsonData = jsonDecode(responseBody);
+        
+        // Usamos el factory del modelo para parsear la respuesta
+        return BalanceResponse.fromJson(jsonData);
+      } else {
+        throw Exception('Failed to load balance data: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('BalanceService: Error en getUserBalance: $e');
+      throw Exception('Balance request failed: $e');
+    }
+  }
+
+
+   static Future<DashboardDetailData> getDashboardDetailData({
     required int rangeInHours,
-    required String dataType, // "d_vehicles_type", "d_vehicles_status", o "d_alert_plan"
+    required String dataType, 
   }) async {
     
     final now = DateTime.now();

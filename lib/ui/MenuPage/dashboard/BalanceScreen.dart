@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:wisetrack_app/data/models/dashboard/DashboardData.dart';
+ import 'package:wisetrack_app/data/models/dashboard/BalanceResponse.dart';
 import 'package:wisetrack_app/data/services/DashboardService.dart';
-import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
+ import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class BalanceScreen extends StatefulWidget {
   const BalanceScreen({Key? key}) : super(key: key);
@@ -11,13 +11,13 @@ class BalanceScreen extends StatefulWidget {
 }
 
 class _BalanceScreenState extends State<BalanceScreen> with SingleTickerProviderStateMixin {
-  late Future<DashboardData> _dashboardDataFuture;
+  late Future<BalanceResponse> _balanceFuture;
   late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
-    _dashboardDataFuture = DashboardService.getDashboardData(rangeInHours: 24);
+    _balanceFuture = DashboardService.getUserBalance();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
@@ -34,8 +34,8 @@ class _BalanceScreenState extends State<BalanceScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: FutureBuilder<DashboardData>(
-        future: _dashboardDataFuture,
+      body: FutureBuilder<BalanceResponse>(
+        future: _balanceFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             _animationController.repeat();
@@ -52,8 +52,8 @@ class _BalanceScreenState extends State<BalanceScreen> with SingleTickerProvider
             return Center(child: Text('Error al cargar datos: ${snapshot.error}'));
           }
           if (snapshot.hasData) {
-            final data = snapshot.data!;
-            return _buildContent(data);
+            final balanceData = snapshot.data!;
+            return _buildContent(balanceData);
           }
           return const Center(child: Text('No hay datos para mostrar.'));
         },
@@ -61,128 +61,65 @@ class _BalanceScreenState extends State<BalanceScreen> with SingleTickerProvider
     );
   }
 
-  /// Construye el contenido principal de la pantalla con los datos de la API.
-  Widget _buildContent(DashboardData data) {
-    // --- Lógica para la tarjeta "Estado de la Flota" ---
-    final statusLegendItems = data.vehicleStatus.entries
-        .map((entry) => LegendItem(
-              text: entry.key.replaceAll('_', ' ').replaceAll(' > 1 hora', ''),
-              value: entry.value.toString(),
-              color: _getColorForStatus(entry.key),
-            ))
-        .toList();
-
-    // --- Lógica para la tarjeta "Tipos de Vehículo" ---
-    final typeLegendItems = data.vehicleTypes.entries
-        .where((entry) => entry.value > 0)
-        .map((entry) => LegendItem(
-              text: entry.key,
-              value: entry.value.toString(),
-              color: _getColorForVehicleType(entry.key),
-            ))
-        .toList();
-
-    // --- Lógica para la tarjeta "Alertas del Plan" ---
-    final alertLegendItems = data.alertPlan.entries
-        .map((entry) => LegendItem(
-              text: entry.key.replaceAll('_', ' '),
-              value: entry.value.toString(),
-              color: _getColorForAlert(entry.key),
-            ))
-        .toList();
-
+  Widget _buildContent(BalanceResponse balanceData) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
-      children: [
-        // --- TARJETA 1: TOTALES GENERALES ---
-        MetricCard(
-          title: 'Resumen General',
-          progressValue: data.totalVehicles > 0 ? data.totalOnline / data.totalVehicles : 0.0,
-          progressText: '${data.totalOnline}',
-          progressColor: Colors.blue,
-          legendItems: [
-            LegendItem(
-                text: 'Vehículos Totales',
-                value: data.totalVehicles.toString(),
-                color: Colors.grey.shade400),
-            LegendItem(
-                text: 'Vehículos En línea',
-                value: data.totalOnline.toString(),
-                color: Colors.blue),
-            LegendItem(
-                text: 'Alertas Totales (24h)',
-                value: data.totalAlerts.toString(),
-                color: Colors.red.shade400),
-          ],
-        ),
-        const SizedBox(height: 16),
+      children: balanceData.data.map((balanceItem) {
+        // Convertimos los valores a double para el progress indicator
+        final values = balanceItem.details
+            .where((detail) => double.tryParse(detail.value) != null)
+            .map((detail) => double.parse(detail.value))
+            .toList();
 
-        // --- TARJETA 2: ESTADO DE LA FLOTA ---
-        MetricCard(
-          title: 'Estado de la Flota',
-          progressValue: 1.0,
-          progressText: '${data.totalVehicles}',
-          progressColor: Colors.blue.shade400,
-          legendItems: statusLegendItems,
-        ),
-        const SizedBox(height: 16),
+        final maxValue = values.isNotEmpty ? values.reduce((a, b) => a > b ? a : b) : 1.0;
+        final progressValue = maxValue > 0 ? (values.isNotEmpty ? values[0] / maxValue : 0.0) : 0.0;
 
-        // --- TARJETA 3: TIPOS DE VEHÍCULO ---
-        MetricCard(
-          title: 'Tipos de Vehículo',
-          progressValue: 1.0,
-          progressText: '${data.vehicleTypes.length}',
-          progressColor: Colors.green.shade400,
-          legendItems: typeLegendItems,
-        ),
-        const SizedBox(height: 16),
-
-        // --- TARJETA 4: ALERTAS DEL PLAN ---
-        MetricCard(
-          title: 'Alertas del Plan (24h)',
-          progressValue: 1.0,
-          progressText: '${data.totalAlerts}',
-          progressColor: Colors.orange.shade600,
-          legendItems: alertLegendItems,
-        ),
-      ],
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: MetricCard(
+            title: balanceItem.balanceTitle,
+            progressValue: progressValue,
+            progressText: values.isNotEmpty ? values[0].toStringAsFixed(2) : '0.00',
+            progressColor: _getColorForBalanceItem(balanceItem.id),
+            legendItems: balanceItem.details.map((detail) {
+              return LegendItem(
+                text: detail.fieldName,
+                value: '${detail.value} ${detail.valueType ?? ''}',
+                color: _getColorForDetail(detail.fieldName),
+              );
+            }).toList(),
+          ),
+        );
+      }).toList(),
     );
   }
 
-  // --- Helpers para asignar colores dinámicamente ---
-  Color _getColorForStatus(String status) {
-    switch (status) {
-      case 'En ruta':
-        return Colors.blue.shade400;
-      case 'Sin Transmision':
-        return Colors.orange.shade400;
-      case 'Ralentí':
-        return Colors.yellow.shade700;
-      case 'Apagado_>_1_hora':
-        return Colors.grey.shade500;
-      default:
-        return Colors.black;
-    }
+  Color _getColorForBalanceItem(int id) {
+    final colors = [
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.red,
+    ];
+    return colors[id % colors.length];
   }
 
-  Color _getColorForVehicleType(String typeName) {
-    return Colors.primaries[typeName.hashCode % Colors.primaries.length];
-  }
-
-  Color _getColorForAlert(String alertType) {
-    switch (alertType) {
-      case 'Exceso_de_velocidad':
-        return Colors.red.shade400;
-      case 'Encendido_de_motor':
-        return Colors.purple.shade400;
-      case 'Zona_peligrosa':
-        return Colors.deepOrange.shade400;
-      case 'En_Destino':
-        return Colors.green.shade400;
-      case 'En_Ruta':
-        return Colors.lightBlue.shade400;
+  Color _getColorForDetail(String fieldName) {
+    switch (fieldName) {
+      case 'Total consumidos':
+      case 'Planificados':
+      case 'Promedio':
+      case 'Optimo cliente':
+      case 'Reportando':
+        return Colors.blue;
+      case 'En ralentí':
+      case 'Realizados':
+      case 'Actual':
+      case 'Sin reportar':
+        return Colors.orange;
       default:
-        return Colors.red.shade300;
+        return Colors.grey;
     }
   }
 }
@@ -208,24 +145,23 @@ class MetricCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 10,
-            color: Colors.white, // Fondo blanco explícito
-
+      color: Colors.white,
       shadowColor: Colors.black,
-shape: RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15.0),
-        // Añadimos el borde "medio negro" (un gris claro)
         side: BorderSide(
           color: Colors.grey.shade300,
           width: 1.0,
         ),
-      ),      child: Padding(
+      ),
+      child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -268,9 +204,10 @@ shape: RoundedRectangleBorder(
           ),
           const SizedBox(width: 8),
           Expanded(
-              child:
-                  Text(item.text, style: TextStyle(color: Colors.grey[700]))),
-          Text(item.value, style: const TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(item.text,
+                  style: TextStyle(color: Colors.grey[700]))),
+          Text(item.value,
+              style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -306,8 +243,8 @@ class CircularMetricIndicator extends StatelessWidget {
           Center(
             child: Text(
               text,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
-            ),
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 22)),
           ),
         ],
       ),
@@ -320,6 +257,9 @@ class LegendItem {
   final String value;
   final Color color;
 
-  const LegendItem(
-      {required this.text, required this.value, required this.color});
+  const LegendItem({
+    required this.text,
+    required this.value,
+    required this.color,
+  });
 }

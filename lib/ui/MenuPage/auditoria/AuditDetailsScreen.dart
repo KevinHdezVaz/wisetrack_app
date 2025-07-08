@@ -1,23 +1,25 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
- import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:open_file_plus/open_file_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'dart:io';
 import 'package:wisetrack_app/data/models/vehicles/VehicleHistoryPoint.dart';
 import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/auditoria/CustomDatePickerDialog.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
-import 'package:geolocator/geolocator.dart';
-// Importamos nuestra clase de utilidades
-import 'package:wisetrack_app/utils/pdf_report_generator.dart';
-import 'package:screenshot/screenshot.dart'; // <-- Añade esta importación
+import 'package:pdf/widgets.dart' as pw; // Este es el prefijo 'pw' que falta
 
 class AuditDetailsScreen extends StatefulWidget {
   final String plate;
-
   const AuditDetailsScreen({Key? key, required this.plate}) : super(key: key);
 
   @override
@@ -27,7 +29,8 @@ class AuditDetailsScreen extends StatefulWidget {
 class _AuditDetailsScreenState extends State<AuditDetailsScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-    final ScreenshotController _screenshotController = ScreenshotController();
+  final GlobalKey _repaintBoundaryKey = GlobalKey();
+  final GlobalKey _dashboardKey = GlobalKey();
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -35,18 +38,12 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
   final List<String> _timeRanges = ['24 horas', '12 horas', '8 horas'];
   String _selectedRange = '24 horas';
   bool _isRangeDropdownOpen = false;
-  bool _isFullscreen = false; 
-
- 
-  
-  // --- 1. NUEVA VARIABLE PARA EL PADDING DEL MAPA ---
+  bool _isFullscreen = false;
   EdgeInsets _mapPadding = EdgeInsets.zero;
-
   final Completer<GoogleMapController> _mapController = Completer();
   final Set<Polyline> _polylines = {};
   final Set<Marker> _markers = {};
   List<HistoryPoint> _historyPoints = [];
-
   String _distanceTraveled = "0 Km";
   String _averageSpeed = "0 km/h";
   String _maxSpeed = "0 km/h";
@@ -58,10 +55,7 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
     _animationController =
         AnimationController(vsync: this, duration: const Duration(seconds: 5));
     _fetchHistory();
-
-      WidgetsBinding.instance.addPostFrameCallback((_) => _setMapPadding());
-
-
+    WidgetsBinding.instance.addPostFrameCallback((_) => _setMapPadding());
   }
 
   @override
@@ -70,28 +64,17 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
     super.dispose();
   }
 
-// --- 3. NUEVO MÉTODO PARA ESTABLECER EL PADDING ---
-void _setMapPadding() {
-  if (!mounted) return;
-
-  final screenHeight = MediaQuery.of(context).size.height;
-  final appBarHeight = AppBar().preferredSize.height; // Altura estándar del AppBar
-  final statusBarHeight = MediaQuery.of(context).padding.top; // Altura de la barra de estado
-  
-  // La altura disponible para el `Stack` (cuerpo del Scaffold)
-  final bodyHeight = screenHeight - appBarHeight - statusBarHeight;
-  
-  // Tu DraggableScrollableSheet tiene initialChildSize: 0.6
-  // por lo que ocupa el 60% de la altura del cuerpo.
-  final sheetHeight = bodyHeight * 0.6;
-
-  setState(() {
-    // Aplicamos esa altura como padding inferior. 
-    // Le restamos un poco (ej. 40) para que la ruta no quede tan pegada al borde.
-    // ¡Puedes ajustar este valor!
-    _mapPadding = EdgeInsets.only(bottom: sheetHeight - 40);
-  });
-}
+  void _setMapPadding() {
+    if (!mounted) return;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final appBarHeight = AppBar().preferredSize.height;
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+    final bodyHeight = screenHeight - appBarHeight - statusBarHeight;
+    final sheetHeight = bodyHeight * 0.6;
+    setState(() {
+      _mapPadding = EdgeInsets.only(bottom: sheetHeight - 40);
+    });
+  }
 
   Future<void> _fetchHistory() async {
     setState(() {
@@ -99,18 +82,15 @@ void _setMapPadding() {
       _errorMessage = null;
     });
     _animationController.repeat();
-
     try {
       final endDate = DateTime(_selectedDate.year, _selectedDate.month,
           _selectedDate.day, 23, 59, 59);
       int hoursToSubtract = int.parse(_selectedRange.split(' ')[0]);
-
       final history = await VehicleService.getVehicleHistoryByRange(
         plate: widget.plate,
         endDate: endDate,
         rangeInHours: hoursToSubtract,
       );
-
       if (mounted) {
         _historyPoints = history;
         if (_historyPoints.isNotEmpty) {
@@ -136,104 +116,87 @@ void _setMapPadding() {
     }
   }
 
+  void _updateMapWithHistory() async {
+    if (_historyPoints.isEmpty) {
+      return;
+    }
+    final points = _historyPoints
+        .where((p) => p.latitude != 0.0 && p.longitude != 0.0)
+        .map((p) => LatLng(p.latitude, p.longitude))
+        .toList();
 
-void _updateMapWithHistory() async {
-  if (_historyPoints.isEmpty) {
-    debugPrint("No hay puntos en _historyPoints");
-    return;
-  }
-
-  final points = _historyPoints
-      .where((p) => p.latitude != 0.0 && p.longitude != 0.0)
-      .map((p) => LatLng(p.latitude, p.longitude))
-      .toList();
-
-  debugPrint("Puntos válidos para la polilínea: ${points.length}");
-
-  _polylines.clear();
-  if (points.length >= 2) {
-    _polylines.add(
-      Polyline(
-        polylineId: const PolylineId('route'),
-        points: points,
-        color: AppColors.primary,
-        width: 5,
-        geodesic: true,
-      ),
-    );
-  }
-
-  _markers.clear();
-
-  if (points.isNotEmpty) {
-    BitmapDescriptor customIcon = await BitmapDescriptor.fromAssetImage(
-      const ImageConfiguration(size: Size(48, 48)),
-      'assets/images/truck_check.png',
-    );
-
-    // --- BUENA PRÁCTICA ---
-    // Si el widget fue eliminado mientras se cargaba la imagen, no continúes.
-    if (!mounted) return;
-
-    _markers.add(Marker(
-      markerId: const MarkerId('start'),
-      position: points.first,
-      icon: customIcon,
-      infoWindow: InfoWindow(
-        title: 'Inicio',
-        snippet: 'Velocidad: ${_historyPoints.first.speed} km/h',
-      ),
-    ));
-
-
-    // Ajustar la cámara para mostrar toda la ruta
-    if (_mapController.isCompleted) {
-      final controller = await _mapController.future;
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (points.length > 1) {
-        controller.animateCamera(
-          CameraUpdate.newLatLngBounds(
-            _boundsFromLatLngList(points),
-            60.0, // Padding
-          ),
-        );
-      } else if (points.isNotEmpty) {
-        controller.animateCamera(
-          CameraUpdate.newLatLngZoom(points.first, 16),
-        );
+    _polylines.clear();
+    if (points.length >= 2) {
+      _polylines.add(
+        Polyline(
+          polylineId: const PolylineId('route'),
+          points: points,
+          color: AppColors.primary,
+          width: 5,
+          geodesic: true,
+        ),
+      );
+    }
+    _markers.clear();
+    if (points.isNotEmpty) {
+      BitmapDescriptor customIcon = await BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(size: Size(48, 48)),
+        'assets/images/truck_check.png',
+      );
+      if (!mounted) return;
+      _markers.add(Marker(
+        markerId: const MarkerId('start'),
+        position: points.first,
+        icon: customIcon,
+        infoWindow: InfoWindow(
+          title: 'Inicio',
+          snippet: 'Velocidad: ${_historyPoints.first.speed} km/h',
+        ),
+      ));
+      if (_mapController.isCompleted) {
+        final controller = await _mapController.future;
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (points.length > 1) {
+          controller.animateCamera(
+            CameraUpdate.newLatLngBounds(
+              _boundsFromLatLngList(points),
+              60.0,
+            ),
+          );
+        } else if (points.isNotEmpty) {
+          controller.animateCamera(
+            CameraUpdate.newLatLngZoom(points.first, 16),
+          );
+        }
       }
     }
+    setState(() {});
   }
 
-  setState(() {});
-}
-  
-// Helper para calcular los límites del mapa
-LatLngBounds _boundsFromLatLngList(List<LatLng> list) {
-  double? x0, x1, y0, y1;
-  for (LatLng latLng in list) {
-    if (x0 == null) {
-      x0 = x1 = latLng.latitude;
-      y0 = y1 = latLng.longitude;
-    } else {
-      if (latLng.latitude > x1!) x1 = latLng.latitude;
-      if (latLng.latitude < x0) x0 = latLng.latitude;
-      if (latLng.longitude > y1!) y1 = latLng.longitude;
-      if (latLng.longitude < y0!) y0 = latLng.longitude;
+  LatLngBounds _boundsFromLatLngList(List<LatLng> list) {
+    double? x0, x1, y0, y1;
+    for (LatLng latLng in list) {
+      if (x0 == null) {
+        x0 = x1 = latLng.latitude;
+        y0 = y1 = latLng.longitude;
+      } else {
+        if (latLng.latitude > x1!) x1 = latLng.latitude;
+        if (latLng.latitude < x0) x0 = latLng.latitude;
+        if (latLng.longitude > y1!) y1 = latLng.longitude;
+        if (latLng.longitude < y0!) y0 = latLng.longitude;
+      }
     }
+    return LatLngBounds(
+      northeast: LatLng(x1!, y1!),
+      southwest: LatLng(x0!, y0!),
+    );
   }
-  return LatLngBounds(
-    northeast: LatLng(x1!, y1!),
-    southwest: LatLng(x0!, y0!),
-  );
-}
 
   void _calculateAndSetMetrics() {
     if (_historyPoints.length < 2) {
       _resetMetrics();
       return;
     }
-
     double totalDistance = 0;
     for (int i = 0; i < _historyPoints.length - 1; i++) {
       totalDistance += Geolocator.distanceBetween(
@@ -244,7 +207,6 @@ LatLngBounds _boundsFromLatLngList(List<LatLng> list) {
       );
     }
     _distanceTraveled = "${(totalDistance / 1000).toStringAsFixed(1)} Km";
-
     double maxSpeed = 0;
     double totalSpeed = 0;
     int speedPointsCount = 0;
@@ -259,11 +221,9 @@ LatLngBounds _boundsFromLatLngList(List<LatLng> list) {
     _averageSpeed = speedPointsCount > 0
         ? "${(totalSpeed / speedPointsCount).toStringAsFixed(0)} km/h"
         : "0 km/h";
-
-    final duration =
-        _historyPoints.last.timestamp!.difference(_historyPoints.first.timestamp!);
+    final duration = _historyPoints.last.timestamp!
+        .difference(_historyPoints.first.timestamp!);
     _totalTime = duration.toString().split('.').first.padLeft(8, "0");
-
     setState(() {});
   }
 
@@ -282,11 +242,261 @@ LatLngBounds _boundsFromLatLngList(List<LatLng> list) {
       builder: (BuildContext context) =>
           DatePickerBottomSheet(initialDate: _selectedDate),
     );
-
     if (pickedDate != null && pickedDate != _selectedDate) {
       setState(() => _selectedDate = pickedDate);
       _fetchHistory();
     }
+  }
+
+  Future<Uint8List?> _captureWidget(GlobalKey key) async {
+    try {
+      final renderObject = key.currentContext?.findRenderObject();
+      if (renderObject is! RenderRepaintBoundary) {
+        throw Exception('No se encontró el RepaintBoundary');
+      }
+
+      final image = await renderObject.toImage(pixelRatio: 2.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('Error capturando widget: $e');
+      return null;
+    }
+  }
+
+  Future<void> _generatePdfReport() async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Generando reporte...')),
+      );
+
+      // Capturar ambos componentes
+      final mapImage = await _captureWidget(_repaintBoundaryKey);
+      final dashboardImage = await _captureWidget(_dashboardKey);
+
+      if (mapImage == null || dashboardImage == null) {
+        throw Exception('Error al capturar los componentes');
+      }
+
+      // Cargar el logo de la app
+      final logo = await rootBundle.load('assets/images/fondoapp.jpg');
+      final logoImage = pw.MemoryImage(logo.buffer.asUint8List());
+
+      // Crear PDF con diseño mejorado
+      final pdf = pw.Document();
+
+
+
+    // Prepara todos los widgets asíncronos primero
+    final distanceRow = await _buildEnhancedMetricRow('Distancia Recorrida', _distanceTraveled, 'coche.png');
+    final speedRow = await _buildEnhancedMetricRow('Velocidad Promedio', _averageSpeed, 'speed.png');
+    final maxSpeedRow = await _buildEnhancedMetricRow('Velocidad Máxima', _maxSpeed, 'warning.png');
+    final timeRow = await _buildEnhancedMetricRow('Tiempo Total', _totalTime, 'timer.png');
+
+
+      // ===== PÁGINA 1: MAPA Y ENCABEZADO =====
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Encabezado con logo
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Image(logoImage, height: 50),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text('Reporte de Auditoría',
+                            style: pw.TextStyle(
+                                fontSize: 16,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColors.blue900)),
+                        pw.Text(widget.plate,
+                            style: pw.TextStyle(
+                                fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                      ],
+                    ),
+                  ],
+                ),
+
+                pw.SizedBox(height: 10),
+
+                // Fecha y rango
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(vertical: 8),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border(
+                      bottom: pw.BorderSide(
+                        color: PdfColors.grey300,
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                          'Fecha: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
+                          style: pw.TextStyle(fontSize: 12)),
+                      pw.Text('Rango: $_selectedRange',
+                          style: pw.TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+
+                pw.SizedBox(height: 40),
+
+                // Mapa
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.center,
+                  children: [
+                    pw.Container(
+                      height: 500,
+                      width: 400, // Ancho fijo recomendado
+                      decoration: pw.BoxDecoration(
+                        border:
+                            pw.Border.all(color: PdfColors.grey200, width: 1),
+                        borderRadius: pw.BorderRadius.circular(8),
+                      ),
+                      child: pw.Image(
+                        pw.MemoryImage(mapImage!),
+                      ),
+                    )
+                  ],
+                ),
+
+                pw.SizedBox(height: 15),
+              ],
+            );
+          },
+        ),
+      );
+
+      // Página 2: Detalles
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) {
+            return pw.Column(
+              children: [
+                pw.Text('Métricas del Viaje',
+                    style: pw.TextStyle(
+                        fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 20),
+                pw.SizedBox(
+                  width:
+                      300, // Solo define el ancho (alto se calcula automáticamente)
+                  child: pw.Image(pw.MemoryImage(dashboardImage!)),
+                ),
+                pw.SizedBox(height: 20),
+               pw.Text('Detalles',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              distanceRow,
+              speedRow,
+              maxSpeedRow,
+              timeRow,
+              ],
+            );
+          },
+        ),
+      );
+
+      // Guardar y abrir PDF
+      final output = await getTemporaryDirectory();
+      final file = File('${output.path}/reporte_${widget.plate}.pdf');
+      await file.writeAsBytes(await pdf.save());
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reporte generado exitosamente')),
+        );
+      }
+
+      await OpenFile.open(file.path);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      debugPrint('Error generando PDF: $e');
+    }
+  }
+
+Future<pw.Widget> _buildEnhancedMetricRow(
+  String label, 
+  String value, 
+  String iconAsset,
+) async {
+  return pw.Container(
+    margin: const pw.EdgeInsets.only(bottom: 10),
+    decoration: pw.BoxDecoration(
+      color: PdfColors.grey50,
+      borderRadius: pw.BorderRadius.circular(8),
+      border: pw.Border.all(color: PdfColors.grey200),
+    ),
+    padding: const pw.EdgeInsets.all(12),
+    child: pw.Row(
+      children: [
+        pw.Container(
+          width: 30,
+          height: 30,
+          decoration: pw.BoxDecoration(
+            color: PdfColors.blue100,
+            shape: pw.BoxShape.circle,
+          ),
+          child: pw.Center(
+            child: await _loadIcon(iconAsset, size: 16),
+          ),
+        ),
+        pw.SizedBox(width: 12),
+        pw.Expanded(
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(label,
+                  style: pw.TextStyle(
+                      fontSize: 10,
+                      color: PdfColors.grey600)),
+              pw.Text(value,
+                  style: pw.TextStyle(
+                      fontSize: 14,
+                      fontWeight: pw.FontWeight.bold)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+ 
+Future<pw.Widget> _loadIcon(String assetName, {double size = 24}) async {
+  final ByteData data = await rootBundle.load('assets/images/icons/$assetName');
+  return pw.Image(
+    pw.MemoryImage(data.buffer.asUint8List()),
+    width: size,
+    height: size,
+  );
+}
+
+  pw.Widget _buildPdfMetricRow(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 8),
+      child: pw.Row(
+        children: [
+          pw.Text(label, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(width: 10),
+          pw.Text(value),
+        ],
+      ),
+    );
   }
 
   @override
@@ -296,140 +506,157 @@ LatLngBounds _boundsFromLatLngList(List<LatLng> list) {
         backgroundColor: Colors.white,
         leading: _buildBackButton(context),
         title: Text(widget.plate,
-            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            style: const TextStyle(
+                color: Colors.black, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-    body: Stack(
-  children: [
-    Stack(
-      children: [
-        GoogleMap(
-          initialCameraPosition:
-              const CameraPosition(target: LatLng(-33.045, -71.619), zoom: 13.0),
-          polylines: _polylines,
-          markers: _markers,
-          padding: _mapPadding,
-          zoomControlsEnabled: false,
-          onMapCreated: (controller) {
-            if (!_mapController.isCompleted) {
-              _mapController.complete(controller);
-            }
-          },
-        ),
-        // Mensaje de "No hay datos de ruta" cuando no hay puntos, no está cargando y no hay error
-        if (!_isLoading && _historyPoints.isEmpty && _errorMessage == null)
-          Positioned.fill(
-            child:   Container(
-              color: Colors.black.withOpacity(0.6), // Fondo semi-transparente
-              child:   const Padding(
-                padding: EdgeInsets.symmetric(vertical: 100, horizontal: 100),
-                child: Text(
-                  'No hay datos de ruta',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    shadows: [
-                      Shadow(
-                        blurRadius: 4.0,
-                        color: Colors.black54,
-                        offset: Offset(2.0, 2.0),
+      body: RepaintBoundary(
+        key: _repaintBoundaryKey,
+        child: Stack(
+          children: [
+            GoogleMap(
+              initialCameraPosition: const CameraPosition(
+                  target: LatLng(-33.045, -71.619), zoom: 13.0),
+              polylines: _polylines,
+              markers: _markers,
+              padding: _mapPadding,
+              zoomControlsEnabled: false,
+              onMapCreated: (controller) {
+                if (!_mapController.isCompleted) {
+                  _mapController.complete(controller);
+                }
+              },
+            ),
+            if (!_isLoading && _historyPoints.isEmpty && _errorMessage == null)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withOpacity(0.6),
+                  child: const Center(
+                    child: Text(
+                      'No hay datos de ruta',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-      ],
-    ),
-    if (!_isLoading && !_isFullscreen) _buildContentSheet(),
-    _buildFullscreenButton(),
-    if (_isLoading)
-      Positioned.fill(
-        child: AnimatedTruckProgress(animation: _animationController),
+            if (!_isLoading && !_isFullscreen)
+              DraggableScrollableSheet(
+                initialChildSize: 0.6,
+                minChildSize: 0.2,
+                maxChildSize: 0.9,
+                builder:
+                    (BuildContext context, ScrollController scrollController) {
+                  return RepaintBoundary(
+                    key: _dashboardKey,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(20.0)),
+                        boxShadow: [
+                          BoxShadow(blurRadius: 10, color: Colors.black12)
+                        ],
+                      ),
+                      child: ListView(
+                        controller: scrollController,
+                        padding:
+                            const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
+                        children: [
+                          _buildDriverInfo(),
+                          const SizedBox(height: 16),
+                          _buildDatePicker(context),
+                          const SizedBox(height: 12),
+                          _buildRangeDropdown(),
+                          const SizedBox(height: 20),
+                          _buildMetricsRow(),
+                          const SizedBox(height: 16),
+                          if (_errorMessage != null)
+                            Center(
+                                child: Text(_errorMessage!,
+                                    style: const TextStyle(color: Colors.red))),
+                          if (!_isLoading &&
+                              _historyPoints.isEmpty &&
+                              _errorMessage == null)
+                            const Center(
+                                child: Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Text(
+                                  'No se encontraron recorridos para la fecha y rango seleccionados.'),
+                            )),
+                          _buildDownloadButton(),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            _buildFullscreenButton(),
+            if (_isLoading)
+              Positioned.fill(
+                child: AnimatedTruckProgress(animation: _animationController),
+              ),
+          ],
+        ),
       ),
-  ],
-),
     );
   }
 
   Widget _buildFullscreenButton() {
-  // Usamos Positioned para colocarlo donde queramos dentro del Stack
-  return Positioned(
-    top: 20.0,  // Distancia desde arriba
-    right: 16.0, // Distancia desde la derecha
-    child: Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 5)
-        ],
-      ),
-      child: IconButton(
-        icon: Image.asset(
-          _isFullscreen 
-            ? 'assets/images/fullscreen_off.png' // Opcional: un ícono para salir
-            : 'assets/images/fullscreen.png',
-          width: 24,
-          height: 24,
+    return Positioned(
+      top: 20.0,
+      right: 16.0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 5)],
         ),
-        onPressed: () {
-          setState(() {
-            _isFullscreen = !_isFullscreen;
-          });
-        },
-        tooltip: _isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa',
-      ),
-    ),
-  );
-}
-
-
-  Widget _buildContentSheet() {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      minChildSize: 0.2,
-      maxChildSize: 0.9,
-      builder: (BuildContext context, ScrollController scrollController) {
-        return Screenshot(
-          controller: _screenshotController,
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20.0)),
-              boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black12)],
-            ),
-            child: ListView(
-              controller: scrollController,
-              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
-              children: [
-                _buildDriverInfo(),
-                const SizedBox(height: 16),
-                _buildDatePicker(context),
-                const SizedBox(height: 12),
-                _buildRangeDropdown(),
-                const SizedBox(height: 20),
-                _buildMetricsRow(),
-                const SizedBox(height: 16),
-                if (_errorMessage != null)
-                  Center(
-                      child: Text(_errorMessage!,
-                          style: const TextStyle(color: Colors.red))),
-                if (!_isLoading && _historyPoints.isEmpty && _errorMessage == null)
-                  const Center(
-                      child: Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Text(
-                        'No se encontraron recorridos para la fecha y rango seleccionados.'),
-                  )),
-                _buildDownloadButton(),
-              ],
-            ),
+        child: IconButton(
+          icon: Image.asset(
+            _isFullscreen
+                ? 'assets/images/fullscreen_off.png'
+                : 'assets/images/fullscreen.png',
+            width: 24,
+            height: 24,
           ),
-        );
-      },
+          onPressed: () {
+            setState(() {
+              _isFullscreen = !_isFullscreen;
+            });
+          },
+          tooltip: _isFullscreen
+              ? 'Salir de pantalla completa'
+              : 'Pantalla completa',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDownloadButton() {
+    final bool isButtonEnabled = !_isLoading && _historyPoints.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: isButtonEnabled ? _generatePdfReport : null,
+          icon: const Icon(Icons.download, color: Colors.white),
+          label: const Text('Descargar Reporte',
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isButtonEnabled ? AppColors.primary : Colors.grey,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.0)),
+          ),
+        ),
+      ),
     );
   }
 
@@ -600,90 +827,4 @@ LatLngBounds _boundsFromLatLngList(List<LatLng> list) {
       ),
     );
   }
-Widget _buildDownloadButton() {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 16.0),
-    child: SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: !_isLoading
-            ? () async {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Generando reporte PDF...')),
-                );
-
-                try {
-                  await Future.delayed(const Duration(milliseconds: 1000));
-
-                  final controller = await _mapController.future;
-                  await controller.animateCamera(CameraUpdate.zoomTo(13.0));
-
-                  final List<dynamic> results = await Future.wait([
-                    controller.takeSnapshot(),
-                    _screenshotController.capture(),
-                  ]);
-
-                  final mapImageBytes = results[0] as Uint8List?;
-                  final panelImageBytes = results[1] as Uint8List?;
-
-                  print('--- INICIO DIAGNÓSTICO DE CAPTURA ---');
-                  print('Captura del mapa: ${mapImageBytes != null ? "${mapImageBytes.lengthInBytes} bytes" : "NULO"}');
-                  print('Captura del panel: ${panelImageBytes != null ? "${panelImageBytes.lengthInBytes} bytes" : "NULO"}');
-
-                  if (mapImageBytes != null) {
-                    final mapFile = File('${(await getTemporaryDirectory()).path}/map_snapshot.png');
-                    await mapFile.writeAsBytes(mapImageBytes);
-                    print('Mapa guardado en: ${mapFile.path}');
-                  }
-                  if (panelImageBytes != null) {
-                    final panelFile = File('${(await getTemporaryDirectory()).path}/panel_snapshot.png');
-                    await panelFile.writeAsBytes(panelImageBytes);
-                    print('Panel guardado en: ${panelFile.path}');
-                  }
-
-                  if (mapImageBytes == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(backgroundColor: Colors.red, content: Text('Error: No se pudo capturar el mapa.')),
-                    );
-                    return;
-                  }
-
-                  if (panelImageBytes == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(backgroundColor: Colors.red, content: Text('Error: No se pudo capturar el panel de datos.')),
-                    );
-                    return;
-                  }
-
-                  await PdfReportGenerator.generateVisualReport(
-                    mapImage: mapImageBytes,
-                    panelImage: panelImageBytes,
-                    plate: widget.plate,
-                  );
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('PDF generado exitosamente')),
-                  );
-                } catch (e, stackTrace) {
-                  print('Error durante la captura o generación del PDF: $e');
-                  print('StackTrace: $stackTrace');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(backgroundColor: Colors.red, content: Text('Error: $e')),
-                  );
-                }
-              }
-            : null,
-        icon: const Icon(Icons.download, color: Colors.white),
-        label: const Text('Descargar',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: !_isLoading ? AppColors.primary : Colors.grey,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12.0)),
-        ),
-      ),
-    ),
-  );
-}
 }

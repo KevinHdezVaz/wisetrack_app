@@ -4,23 +4,17 @@ import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'custom_dialogs.dart';
 
 class SecurityActionsScreen extends StatelessWidget {
-  const SecurityActionsScreen({Key? key}) : super(key: key);
+  // Se añade la patente del vehículo como un campo requerido.
+  final String plate;
+
+  const SecurityActionsScreen({
+    Key? key,
+    required this.plate, // El constructor ahora requiere la patente.
+  }) : super(key: key);
 
   /// Simula una llamada a un servidor para realizar una acción.
-  ///
-  /// En una aplicación real, aquí harías una petición HTTP.
-  /// Devolverá 'true' para simular un éxito y 'false' para un error.
   Future<bool> _simulateApiCall() async {
-    // Muestra un indicador de carga mientras se realiza la operación (opcional pero recomendado)
-    // Por ejemplo:
-    // showDialog(context: context, builder: (_) => Center(child: CircularProgressIndicator()));
-
-    // Esperamos 2 segundos para simular la demora de la red.
     await Future.delayed(const Duration(seconds: 2));
-
-    // Simula un resultado aleatorio: 70% de éxito, 30% de error.
-    // En tu app, aquí verificarías la respuesta real del servidor.
-    // Por ejemplo: if (response.statusCode == 200) return true;
     return (DateTime.now().second % 10) < 7;
   }
 
@@ -32,9 +26,26 @@ class SecurityActionsScreen extends StatelessWidget {
         scrolledUnderElevation: 0,
         backgroundColor: Colors.white,
         leading: _buildBackButton(context),
-        title: const Text(
-          'Acciones de seguridad',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        // El título ahora muestra la pantalla y la patente del vehículo.
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Acciones de seguridad',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            Text(
+              'Vehículo: $plate', // Muestra la patente recibida
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+          ],
         ),
       ),
       body: ListView(
@@ -46,18 +57,12 @@ class SecurityActionsScreen extends StatelessWidget {
             icon: Icons.local_gas_station_outlined,
             label: 'Corte de combustible',
             onTap: () {
-              // --- Flujo de Diálogos para "Corte de combustible" ---
-              // 1. Muestra el diálogo de PRECAUCIÓN
               showWarningDialog(
                 context,
                 title: 'Cortar combustible',
                 subtitle: 'Esta acción es crítica. ¿Estás seguro de continuar?',
-                // 2. Lógica que se ejecuta si el usuario presiona "Continuar"
                 onConfirm: () async {
-                  bool success =
-                      await _simulateApiCall(); // Llama a la API simulada
-
-                  // 3. Muestra ÉXITO o ERROR según el resultado
+                  bool success = await _simulateApiCall();
                   if (success) {
                     showSuccessDialog(context,
                         title: 'Corte realizado',

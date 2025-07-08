@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:wisetrack_app/data/models/vehicles/VehicleDetail.dart';
- import 'package:wisetrack_app/data/services/vehicles_service.dart';
+import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/auditoria/AuditDetailsScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/EditMobileScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/SecurityActionsScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
-// 1. IMPORTAMOS EL WIDGET DE ANIMACIÓN
 import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class VehicleDetailScreen extends StatefulWidget {
@@ -17,30 +17,86 @@ class VehicleDetailScreen extends StatefulWidget {
   State<VehicleDetailScreen> createState() => _VehicleDetailScreenState();
 }
 
-// 2. AÑADIMOS EL SingleTickerProviderStateMixin
 class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTickerProviderStateMixin {
   late Future<VehicleDetail> _vehicleDetailFuture;
-  // 3. DECLARAMOS EL ANIMATION CONTROLLER
   late AnimationController _animationController;
   
+  String? _address;
+
   @override
   void initState() {
     super.initState();
-    // 4. INICIALIZAMOS EL ANIMATION CONTROLLER
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3), // Misma duración que en MobilesScreen
+      duration: const Duration(seconds: 3),
     );
-    // La llamada al servicio se mantiene igual
+    
     _vehicleDetailFuture = VehicleService.getVehicleDetail(widget.plate);
+
+    _vehicleDetailFuture.then((vehicleDetail) {
+      if (mounted) {
+        _getAddressFromCoordinates(vehicleDetail.location);
+      }
+    }).catchError((error) {
+      debugPrint("Error al cargar detalles del vehículo, no se puede geocodificar: $error");
+    });
   }
 
-  // 5. HACEMOS DISPOSE DEL CONTROLLER PARA LIBERAR RECURSOS
   @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
   }
+
+  // --- INICIO DE LA CORRECCIÓN ---
+  // Se ha modificado esta función para manejar el formato "lat: ..., lon: ..."
+  Future<void> _getAddressFromCoordinates(String location) async {
+    if (location.isEmpty) {
+      if (mounted) setState(() => _address = 'Ubicación no disponible');
+      return;
+    }
+
+    try {
+      // 1. Dividimos la cadena por la coma para separar latitud y longitud.
+      final parts = location.split(',');
+      if (parts.length != 2) throw const FormatException('Formato de ubicación inválido');
+
+      // 2. Limpiamos el texto no numérico de cada parte.
+      //    'lat: -22.99...' se convierte en '-22.99...'
+      //    ' lon: -69.08...' se convierte en '-69.08...'
+      final latString = parts[0].replaceAll(RegExp(r'lat:'), '').trim();
+      final lonString = parts[1].replaceAll(RegExp(r'lon:'), '').trim();
+
+      // 3. Intentamos convertir las cadenas limpias a números.
+      final lat = double.tryParse(latString);
+      final lon = double.tryParse(lonString);
+
+      if (lat == null || lon == null) throw const FormatException('Coordenadas inválidas después de limpiar');
+
+      // El resto de la lógica es la misma
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lon);
+
+      if (mounted && placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        final readableAddress = "${p.street}, ${p.locality}, ${p.country}";
+        setState(() {
+          _address = readableAddress;
+        });
+      } else if (mounted) {
+        setState(() {
+          _address = 'Dirección no encontrada';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _address = 'No se pudo obtener la dirección';
+        });
+        debugPrint("Error de geocodificación: $e");
+      }
+    }
+  }
+  // --- FIN DE LA CORRECCIÓN ---
 
   @override
   Widget build(BuildContext context) {
@@ -50,11 +106,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
         child: FutureBuilder<VehicleDetail>(
           future: _vehicleDetailFuture,
           builder: (context, snapshot) {
-            // --- ESTADO DE CARGA MODIFICADO ---
             if (snapshot.connectionState == ConnectionState.waiting) {
-              // Iniciamos la animación en bucle
               _animationController.repeat();
-              // Mostramos el loader animado en lugar del CircularProgressIndicator
               return Center(
                 child: AnimatedTruckProgress(
                   animation: _animationController,
@@ -62,26 +115,20 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
               );
             }
 
-            // Si ya no estamos cargando, detenemos la animación por si acaso
             _animationController.stop();
 
-            // --- ESTADO DE ERROR ---
             if (snapshot.hasError) {
               return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Text('Error al cargar los detalles: ${snapshot.error}', textAlign: TextAlign.center),
-                )
-              );
+                  child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Text('Error al cargar los detalles: ${snapshot.error}', textAlign: TextAlign.center)));
             }
 
-            // --- ESTADO DE ÉXITO ---
             if (snapshot.hasData) {
               final vehicleDetail = snapshot.data!;
               return _buildContent(context, vehicleDetail);
             }
 
-            // Estado por defecto
             return const Center(child: Text('No hay datos disponibles.'));
           },
         ),
@@ -89,8 +136,6 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
     );
   }
 
-  // El resto de la clase no necesita cambios
-  
   Widget _buildContent(BuildContext context, VehicleDetail vehicle) {
     return Column(
       children: [
@@ -104,7 +149,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
               _buildSectionTitle('Reportabilidad'),
               _buildDataRow('Último reporte', _formatDate(vehicle.lastReport)),
               const SizedBox(height: 12),
-              _buildDataRow('Ubicación', vehicle.location.isNotEmpty ? vehicle.location : 'Sin datos'),
+              _buildDataRow('Ubicación', _address ?? 'Obteniendo dirección...'),
               const SizedBox(height: 24),
               _buildSectionTitle('Seguridad'),
               _buildDataRow('Alimentación', vehicle.batteryVolt != null ? '${vehicle.batteryVolt} V' : 'Sin datos'),
@@ -118,6 +163,9 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
       ],
     );
   }
+  
+  // --- El resto de tus widgets no necesitan cambios ---
+  // ... (todos los demás widgets _build... se mantienen igual)
 
   Widget _buildCustomAppBar(BuildContext context, VehicleDetail vehicle) {
     return Container(
@@ -144,7 +192,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => EditMobileScreen(plate: vehicle.plate ,)),
+                        MaterialPageRoute(builder: (context) => EditMobileScreen(plate: vehicle.plate,)),
                       );
                     },
                   ),
@@ -158,54 +206,55 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
     );
   }
 
-Widget _buildTopStatusCard(VehicleDetail vehicle) {
-  return Card(
-    color: Colors.white,
-    elevation: 2,
-    shadowColor: Colors.black12,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(15.0),
-      side: BorderSide(color: Colors.grey.shade300, width: 1.0),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatusItem(Icons.location_on, 'Posición', vehicle.position),
-          const SizedBox(height: 40, child: VerticalDivider()),
-          _buildStatusItem(Icons.gps_fixed, 'Conexión', vehicle.connection),
-          const SizedBox(height: 40, child: VerticalDivider()),
-          _buildStatusItem(Icons.vpn_key, 'Estado', vehicle.status),
-        ],
+  Widget _buildTopStatusCard(VehicleDetail vehicle) {
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      shadowColor: Colors.black12,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15.0),
+        side: BorderSide(color: Colors.grey.shade300, width: 1.0),
       ),
-    ),
-  );
-}
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildStatusItem(Icons.location_on, 'Posición', vehicle.position),
+            const SizedBox(height: 40, child: VerticalDivider()),
+            _buildStatusItem(Icons.gps_fixed, 'Conexión', vehicle.connection),
+            const SizedBox(height: 40, child: VerticalDivider()),
+            _buildStatusItem(Icons.vpn_key, 'Estado', vehicle.status),
+          ],
+        ),
+      ),
+    );
+  }
 
-Widget _buildStatusItem(IconData icon, String title, String status) {
-  final bool isPositive = status.toLowerCase() == 'online' || 
-                         status.toLowerCase() == 'encendido' || 
-                         status.toLowerCase() == 'valida';
-  final Color statusColor = isPositive ? Colors.green.shade700 : Colors.red.shade700;
-  
-  return Column(
-    children: [
-      Icon(icon, color: statusColor, size: 28), 
-      const SizedBox(height: 8),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-          const SizedBox(width: 4),
-          Icon(Icons.info_outline, color: Colors.grey.shade400, size: 14),
-        ],
-      ),
-      const SizedBox(height: 4),
-      Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.w500)),
-    ],
-  );
-}
+  Widget _buildStatusItem(IconData icon, String title, String status) {
+    final bool isPositive = status.toLowerCase() == 'online' ||
+        status.toLowerCase() == 'encendido' ||
+        status.toLowerCase() == 'valida';
+    final Color statusColor = isPositive ? Colors.green.shade700 : Colors.red.shade700;
+    
+    return Column(
+      children: [
+        Icon(icon, color: statusColor, size: 28),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 4),
+            Icon(Icons.info_outline, color: Colors.grey.shade400, size: 14),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.w500)),
+      ],
+    );
+  }
+
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -236,7 +285,7 @@ Widget _buildStatusItem(IconData icon, String title, String status) {
         children: [
           Text(label, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
           Flexible(
-            child: Text(value, textAlign: TextAlign.end),
+            child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis),
           ),
         ],
       ),
@@ -250,9 +299,9 @@ Widget _buildStatusItem(IconData icon, String title, String status) {
           width: double.infinity,
           child: OutlinedButton(
             onPressed: () {
-                Navigator.push(
+              Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => AuditDetailsScreen(plate: widget.plate, )),
+                MaterialPageRoute(builder: (context) => AuditDetailsScreen(plate: widget.plate,)),
               );
             },
             style: OutlinedButton.styleFrom(
@@ -270,7 +319,9 @@ Widget _buildStatusItem(IconData icon, String title, String status) {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => SecurityActionsScreen()),
+                MaterialPageRoute(builder: (context) => SecurityActionsScreen(
+                  plate: widget.plate,
+                )),
               );
             },
             icon: const Icon(Icons.shield_outlined, color: Colors.white),

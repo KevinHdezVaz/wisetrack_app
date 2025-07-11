@@ -1,5 +1,7 @@
 // lib/data/models/vehicles/VehicleDetail.dart
 
+import 'package:flutter/material.dart';
+
 class VehicleDetail {
   final String plate;
   final String position;
@@ -9,6 +11,7 @@ class VehicleDetail {
   final String location;
   final double? batteryVolt;
   final String fuelCutoff;
+  final Map<String, String>? accessories; // New field for accessories
 
   VehicleDetail({
     required this.plate,
@@ -19,30 +22,42 @@ class VehicleDetail {
     required this.location,
     this.batteryVolt,
     required this.fuelCutoff,
+    this.accessories, // Added to constructor
   });
 
-  // --- FACTORY CORREGIDO Y MÁS ROBUSTO ---
   factory VehicleDetail.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? {};
 
-    // --- CAMBIO 1: Helper para parsear números de forma segura ---
-    // Esta pequeña función interna revisa si el valor es un número o un texto
-    // que se pueda convertir a número. Si no, devuelve null.
+    // Helper para parsear números de forma segura
     double? safeParseDouble(dynamic value) {
       if (value is num) {
         return value.toDouble();
       }
       if (value is String) {
-        return double.tryParse(value); // tryParse maneja strings vacíos ("") devolviendo null
+        return double.tryParse(value);
       }
       return null;
     }
 
-    // --- CAMBIO 2: Helper para parsear fechas de forma segura ---
-    // Revisa que el valor sea un String antes de intentar el parseo.
+    // Helper para parsear fechas de forma segura
     DateTime? safeParseDateTime(dynamic value) {
       if (value is String) {
-        return DateTime.tryParse(value); // tryParse maneja textos inválidos devolviendo null
+        return DateTime.tryParse(value);
+      }
+      return null;
+    }
+
+    // Helper para parsear accesorios de forma segura
+    Map<String, String>? safeParseAccessories(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        try {
+          // Convertimos el mapa dinámico a Map<String, String>
+          return value.map((key, value) => 
+            MapEntry(key, value?.toString() ?? 'Sin dato'));
+        } catch (e) {
+          debugPrint('Error parsing accessories: $e');
+          return null;
+        }
       }
       return null;
     }
@@ -52,16 +67,13 @@ class VehicleDetail {
       position: data['position'] as String? ?? 'Inválida',
       connection: data['connection'] as String? ?? 'Offline',
       status: data['status'] as String? ?? 'Apagado',
-      
-      // Usamos el helper para la fecha
       lastReport: safeParseDateTime(data['last_report']),
-
       location: data['location'] as String? ?? 'Sin ubicación',
-      
-      // Usamos el helper para el voltaje. ¡Esto corrige el crash!
       batteryVolt: safeParseDouble(data['battery_volt']),
-
       fuelCutoff: data['fuel_cutoff'] as String? ?? 'Sin datos',
+      accessories: json['accessories'] != null 
+          ? safeParseAccessories(json['accessories']['data'])
+          : null,
     );
   }
 }

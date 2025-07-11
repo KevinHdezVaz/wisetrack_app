@@ -10,13 +10,15 @@ import 'package:geolocator/geolocator.dart';
 import 'package:open_file_plus/open_file_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
+import 'package:wisetrack_app/data/models/User/UserDetail.dart';
 import 'dart:io';
 import 'package:wisetrack_app/data/models/vehicles/VehicleHistoryPoint.dart';
+import 'package:wisetrack_app/data/services/UserCacheService.dart';
 import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/auditoria/CustomDatePickerDialog.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
-import 'package:pdf/widgets.dart' as pw; // Este es el prefijo 'pw' que falta
+import 'package:pdf/widgets.dart' as pw;
 
 class AuditDetailsScreen extends StatefulWidget {
   final String plate;
@@ -33,6 +35,7 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
   final GlobalKey _dashboardKey = GlobalKey();
 
   bool _isLoading = true;
+  bool _isGeneratingPdf = false; // New variable for PDF generation loading state
   String? _errorMessage;
   DateTime _selectedDate = DateTime.now();
   final List<String> _timeRanges = ['24 horas', '12 horas', '8 horas'];
@@ -49,14 +52,21 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
   String _maxSpeed = "0 km/h";
   String _totalTime = "00:00:00";
 
-  @override
-  void initState() {
-    super.initState();
-    _animationController =
-        AnimationController(vsync: this, duration: const Duration(seconds: 5));
-    _fetchHistory();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _setMapPadding());
-  }
+UserData? _cachedUser;
+
+@override
+void initState() {
+  super.initState();
+  _animationController =
+      AnimationController(vsync: this, duration: const Duration(seconds: 5));
+  
+  // 2. Llama a las funciones para cargar tus datos
+  _loadUserData(); // <-- AÑADE ESTA LÍNEA
+  _fetchHistory();
+  
+  WidgetsBinding.instance.addPostFrameCallback((_) => _setMapPadding());
+}
+
 
   @override
   void dispose() {
@@ -75,6 +85,15 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
       _mapPadding = EdgeInsets.only(bottom: sheetHeight - 40);
     });
   }
+
+Future<void> _loadUserData() async {
+  final user = await UserCacheService.getCachedUserData();
+  if (mounted) {
+    setState(() {
+      _cachedUser = user;
+    });
+  }
+}
 
   Future<void> _fetchHistory() async {
     setState(() {
@@ -139,10 +158,13 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
     }
     _markers.clear();
     if (points.isNotEmpty) {
-      BitmapDescriptor customIcon = await BitmapDescriptor.fromAssetImage(
-        const ImageConfiguration(size: Size(48, 48)),
-        'assets/images/truck_check.png',
-      );
+     BitmapDescriptor customIcon = await _getMarkerIconFromAsset(
+      'assets/images/truck_check.png',
+      width: 130, // Ajusta este valor (en píxeles) según el tamaño que desees
+    );
+
+  
+ 
       if (!mounted) return;
       _markers.add(Marker(
         markerId: const MarkerId('start'),
@@ -236,6 +258,29 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
     });
   }
 
+  // Coloca esta función dentro de tu clase _AuditDetailsScreenState
+
+Future<BitmapDescriptor> _getMarkerIconFromAsset(String assetPath, {int width = 120}) async {
+  // Carga la imagen desde los assets
+  final ByteData data = await rootBundle.load(assetPath);
+  
+  // Decodifica la imagen, especificando el ancho de destino para redimensionarla
+  final ui.Codec codec = await ui.instantiateImageCodec(
+    data.buffer.asUint8List(),
+    targetWidth: width,
+  );
+  
+  // Obtiene el primer frame de la imagen ya redimensionada
+  final ui.FrameInfo fi = await codec.getNextFrame();
+  
+  // Convierte la imagen a bytes en formato PNG
+  final Uint8List? resizedBytes = (await fi.image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
+  
+  // Crea el BitmapDescriptor desde los bytes de la imagen redimensionada
+  return BitmapDescriptor.fromBytes(resizedBytes!);
+}
+
+
   Future<void> _showCustomDatePicker(BuildContext context) async {
     final DateTime? pickedDate = await showDialog<DateTime>(
       context: context,
@@ -265,18 +310,31 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
   }
 
   Future<void> _generatePdfReport() async {
-    try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Generando reporte...')),
-      );
+try {
+  // 1. Captura los widgets PRIMERO, mientras la UI está limpia
+  final dashboardImage = await _captureWidget(_dashboardKey);
+  
+  Uint8List? mapImage;
+  if (Platform.isIOS) {
+    final GoogleMapController mapController = await _mapController.future;
+    mapImage = await mapController.takeSnapshot();
+  } else {
+    mapImage = await _captureWidget(_repaintBoundaryKey);
+  }
 
-      // Capturar ambos componentes
-      final mapImage = await _captureWidget(_repaintBoundaryKey);
-      final dashboardImage = await _captureWidget(_dashboardKey);
+  // 2. AHORA SÍ, activa el estado de carga para el resto del proceso
+  setState(() {
+    _isGeneratingPdf = true;
+  });
+  _animationController.repeat();
 
-      if (mapImage == null || dashboardImage == null) {
-        throw Exception('Error al capturar los componentes');
-      }
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Generando reporte...')),
+  );
+  
+  if (mapImage == null || dashboardImage == null) {
+    throw Exception('Error al capturar los componentes');
+  }
 
       // Cargar el logo de la app
       final logo = await rootBundle.load('assets/images/fondoapp.jpg');
@@ -285,14 +343,11 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
       // Crear PDF con diseño mejorado
       final pdf = pw.Document();
 
-
-
-    // Prepara todos los widgets asíncronos primero
-    final distanceRow = await _buildEnhancedMetricRow('Distancia Recorrida', _distanceTraveled, 'coche.png');
-    final speedRow = await _buildEnhancedMetricRow('Velocidad Promedio', _averageSpeed, 'speed.png');
-    final maxSpeedRow = await _buildEnhancedMetricRow('Velocidad Máxima', _maxSpeed, 'warning.png');
-    final timeRow = await _buildEnhancedMetricRow('Tiempo Total', _totalTime, 'timer.png');
-
+      // Prepara todos los widgets asíncronos primero
+      final distanceRow = await _buildEnhancedMetricRow('Distancia Recorrida', _distanceTraveled, 'coche.png');
+      final speedRow = await _buildEnhancedMetricRow('Velocidad Promedio', _averageSpeed, 'speed.png');
+      final maxSpeedRow = await _buildEnhancedMetricRow('Velocidad Máxima', _maxSpeed, 'warning.png');
+      final timeRow = await _buildEnhancedMetricRow('Tiempo Total', _totalTime, 'timer.png');
 
       // ===== PÁGINA 1: MAPA Y ENCABEZADO =====
       pdf.addPage(
@@ -351,23 +406,22 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
                 pw.SizedBox(height: 40),
 
                 // Mapa
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.center,
-                  children: [
-                    pw.Container(
-                      height: 500,
-                      width: 400, // Ancho fijo recomendado
-                      decoration: pw.BoxDecoration(
-                        border:
-                            pw.Border.all(color: PdfColors.grey200, width: 1),
-                        borderRadius: pw.BorderRadius.circular(8),
-                      ),
-                      child: pw.Image(
-                        pw.MemoryImage(mapImage!),
-                      ),
-                    )
-                  ],
-                ),
+              pw.Row(
+  mainAxisAlignment: pw.MainAxisAlignment.center,
+  children: [
+    pw.Container(
+      height: 500,
+      width: 400,
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey200, width: 1),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: mapImage != null 
+          ? pw.Image(pw.MemoryImage(mapImage!))
+          : pw.Center(child: pw.Text('No se pudo cargar el mapa')),
+    ),
+  ],
+),
 
                 pw.SizedBox(height: 15),
               ],
@@ -387,17 +441,16 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
                         fontSize: 18, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 20),
                 pw.SizedBox(
-                  width:
-                      300, // Solo define el ancho (alto se calcula automáticamente)
-                  child: pw.Image(pw.MemoryImage(dashboardImage!)),
+                  width: 300,
+                  child: pw.Image(pw.MemoryImage(dashboardImage)),
                 ),
                 pw.SizedBox(height: 20),
-               pw.Text('Detalles',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              distanceRow,
-              speedRow,
-              maxSpeedRow,
-              timeRow,
+                pw.Text('Detalles',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                distanceRow,
+                speedRow,
+                maxSpeedRow,
+                timeRow,
               ],
             );
           },
@@ -419,6 +472,7 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
       await OpenFile.open(file.path);
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
@@ -427,64 +481,66 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
         );
       }
       debugPrint('Error generando PDF: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingPdf = false;
+        });
+        _animationController.stop();
+        _animationController.reset();
+      }
     }
   }
 
-Future<pw.Widget> _buildEnhancedMetricRow(
-  String label, 
-  String value, 
-  String iconAsset,
-) async {
-  return pw.Container(
-    margin: const pw.EdgeInsets.only(bottom: 10),
-    decoration: pw.BoxDecoration(
-      color: PdfColors.grey50,
-      borderRadius: pw.BorderRadius.circular(8),
-      border: pw.Border.all(color: PdfColors.grey200),
-    ),
-    padding: const pw.EdgeInsets.all(12),
-    child: pw.Row(
-      children: [
-        pw.Container(
-          width: 30,
-          height: 30,
-          decoration: pw.BoxDecoration(
-            color: PdfColors.blue100,
-            shape: pw.BoxShape.circle,
+  Future<pw.Widget> _buildEnhancedMetricRow(
+      String label, String value, String iconAsset) async {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 10),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.grey50,
+        borderRadius: pw.BorderRadius.circular(8),
+        border: pw.Border.all(color: PdfColors.grey200),
+      ),
+      padding: const pw.EdgeInsets.all(12),
+      child: pw.Row(
+        children: [
+          pw.Container(
+            width: 30,
+            height: 30,
+            decoration: pw.BoxDecoration(
+              color: PdfColors.blue100,
+              shape: pw.BoxShape.circle,
+            ),
+            child: pw.Center(
+              child: await _loadIcon(iconAsset, size: 16),
+            ),
           ),
-          child: pw.Center(
-            child: await _loadIcon(iconAsset, size: 16),
+          pw.SizedBox(width: 12),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(label,
+                    style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+                pw.Text(value,
+                    style:
+                        pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              ],
+            ),
           ),
-        ),
-        pw.SizedBox(width: 12),
-        pw.Expanded(
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(label,
-                  style: pw.TextStyle(
-                      fontSize: 10,
-                      color: PdfColors.grey600)),
-              pw.Text(value,
-                  style: pw.TextStyle(
-                      fontSize: 14,
-                      fontWeight: pw.FontWeight.bold)),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
- 
-Future<pw.Widget> _loadIcon(String assetName, {double size = 24}) async {
-  final ByteData data = await rootBundle.load('assets/images/icons/$assetName');
-  return pw.Image(
-    pw.MemoryImage(data.buffer.asUint8List()),
-    width: size,
-    height: size,
-  );
-}
+        ],
+      ),
+    );
+  }
+
+  Future<pw.Widget> _loadIcon(String assetName, {double size = 24}) async {
+    final ByteData data = await rootBundle.load('assets/images/icons/$assetName');
+    return pw.Image(
+      pw.MemoryImage(data.buffer.asUint8List()),
+      width: size,
+      height: size,
+    );
+  }
 
   pw.Widget _buildPdfMetricRow(String label, String value) {
     return pw.Padding(
@@ -519,6 +575,7 @@ Future<pw.Widget> _loadIcon(String assetName, {double size = 24}) async {
                   target: LatLng(-33.045, -71.619), zoom: 13.0),
               polylines: _polylines,
               markers: _markers,
+              myLocationButtonEnabled: false,
               padding: _mapPadding,
               zoomControlsEnabled: false,
               onMapCreated: (controller) {
@@ -595,7 +652,7 @@ Future<pw.Widget> _loadIcon(String assetName, {double size = 24}) async {
                 },
               ),
             _buildFullscreenButton(),
-            if (_isLoading)
+            if (_isLoading || _isGeneratingPdf)
               Positioned.fill(
                 child: AnimatedTruckProgress(animation: _animationController),
               ),
@@ -637,7 +694,7 @@ Future<pw.Widget> _loadIcon(String assetName, {double size = 24}) async {
   }
 
   Widget _buildDownloadButton() {
-    final bool isButtonEnabled = !_isLoading && _historyPoints.isNotEmpty;
+    final bool isButtonEnabled = !_isLoading && !_isGeneratingPdf && _historyPoints.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -754,7 +811,7 @@ Future<pw.Widget> _loadIcon(String assetName, {double size = 24}) async {
                     onTap: () {
                       setState(() {
                         _selectedRange = range;
-                        _isRangeDropdownOpen = false;
+                        _isRangeDropdownOpen = false; // Corrected from _isRangeDropdownOverlay
                       });
                       _fetchHistory();
                     },
@@ -787,22 +844,35 @@ Future<pw.Widget> _loadIcon(String assetName, {double size = 24}) async {
     );
   }
 
-  Widget _buildDriverInfo() {
-    return Row(
-      children: [
-        const CircleAvatar(
-            radius: 20,
-            backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=5')),
-        const SizedBox(width: 12),
-        const Text('Conductor',
-            style: TextStyle(color: Colors.grey, fontSize: 14)),
-        const Spacer(),
-        const Text('Antonio López',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-      ],
-    );
-  }
+Widget _buildDriverInfo() {
+  // Obtenemos el nombre y la URL de la imagen. Si son nulos, usamos valores por defecto.
+  final String driverName = _cachedUser?.fullName ?? 'Cargando...';
+  final String? imageUrl = _cachedUser?.userImage;
 
+  return Row(
+    children: [
+      CircleAvatar(
+        radius: 20,
+        backgroundColor: Colors.grey.shade200, // Color de fondo por si la imagen falla
+        // Si la URL de la imagen existe y no está vacía, la usamos.
+        backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
+            ? NetworkImage(imageUrl)
+            : null,
+        // Si no hay imagen, mostramos un ícono de persona.
+        child: (imageUrl == null || imageUrl.isEmpty)
+            ? const Icon(Icons.person, color: Colors.grey)
+            : null,
+      ),
+      const SizedBox(width: 12),
+      const Text('Conductor',
+          style: TextStyle(color: Colors.grey, fontSize: 14)),
+      const Spacer(),
+      // Usamos el nombre del conductor cargado desde el caché.
+      Text(driverName,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+    ],
+  );
+}
   Widget _buildMetricCard(String value, String label) {
     return SizedBox(
       width: 130,

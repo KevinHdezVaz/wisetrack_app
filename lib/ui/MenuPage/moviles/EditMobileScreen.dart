@@ -240,7 +240,7 @@ class _EditMobileScreenState extends State<EditMobileScreen> {
     final bool isEnabled = _selectedVehicleTypeId != null && !_isSaving;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 50),
+      padding: const EdgeInsets.symmetric(vertical: 50, horizontal: 20),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(

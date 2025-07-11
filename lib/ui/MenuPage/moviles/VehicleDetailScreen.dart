@@ -1,17 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:wisetrack_app/data/models/vehicles/VehicleAccesories.dart';
 import 'package:wisetrack_app/data/models/vehicles/VehicleDetail.dart';
 import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/auditoria/AuditDetailsScreen.dart';
+import 'package:wisetrack_app/ui/MenuPage/auditoria/AuditoriaScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/EditMobileScreen.dart';
+import 'package:wisetrack_app/ui/MenuPage/moviles/MobilesScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/SecurityActionsScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class VehicleDetailScreen extends StatefulWidget {
-  final String plate;
-  const VehicleDetailScreen({Key? key, required this.plate}) : super(key: key);
+   final String plate;
+  final String originScreen; // 'mobiles' o 'audit'
+  final Function()? onDataChanged;
+
+  const VehicleDetailScreen({
+    Key? key, 
+    required this.plate,
+    this.originScreen = 'mobiles', // Valor por defecto
+    this.onDataChanged,
+  }) : super(key: key);
 
   @override
   State<VehicleDetailScreen> createState() => _VehicleDetailScreenState();
@@ -19,6 +30,8 @@ class VehicleDetailScreen extends StatefulWidget {
 
 class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTickerProviderStateMixin {
   late Future<VehicleDetail> _vehicleDetailFuture;
+    late Future<VehicleAccessories?> _accessoriesFuture; // Nuevo Future para accesorios
+
   late AnimationController _animationController;
   
   String? _address;
@@ -32,6 +45,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
     );
     
     _vehicleDetailFuture = VehicleService.getVehicleDetail(widget.plate);
+    _accessoriesFuture = _loadAccessories(); // Cargar accesorios
 
     _vehicleDetailFuture.then((vehicleDetail) {
       if (mounted) {
@@ -41,6 +55,31 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
       debugPrint("Error al cargar detalles del vehículo, no se puede geocodificar: $error");
     });
   }
+
+Future<VehicleAccessories?> _loadAccessories() async {
+    try {
+      return await VehicleService.getVehicleAccessories(widget.plate);
+    } catch (e) {
+      debugPrint("Error al cargar accesorios: $e");
+      return null;
+    }
+  }
+
+void _handleBackAction() {
+  if (widget.onDataChanged != null) {
+    widget.onDataChanged!();
+  }
+
+  // Detener la animación primero
+  _animationController.stop();
+
+  // Navegación simplificada
+  if (widget.originScreen == 'audit') {
+    Navigator.pop(context); // Vuelve atrás normalmente
+  } else {
+    Navigator.pop(context); // Vuelve atrás normalmente
+  }
+}
 
   @override
   void dispose() {
@@ -96,86 +135,195 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
       }
     }
   }
-  // --- FIN DE LA CORRECCIÓN ---
 
+  
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: FutureBuilder<VehicleDetail>(
-          future: _vehicleDetailFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              _animationController.repeat();
-              return Center(
-                child: AnimatedTruckProgress(
-                  animation: _animationController,
-                ),
-              );
-            }
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        
+        final shouldRefresh = await _showExitConfirmation();
+            _animationController.stop(); // Añade esto
 
-            _animationController.stop();
-
-            if (snapshot.hasError) {
-              return Center(
-                  child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Text('Error al cargar los detalles: ${snapshot.error}', textAlign: TextAlign.center)));
-            }
-
-            if (snapshot.hasData) {
-              final vehicleDetail = snapshot.data!;
-              return _buildContent(context, vehicleDetail);
-            }
-
-            return const Center(child: Text('No hay datos disponibles.'));
-          },
+        // CORRECCIÓN: Usar onDataChanged en lugar de onShouldRefresh
+        if (shouldRefresh && widget.onDataChanged != null) {
+          widget.onDataChanged!(); // <-- Aquí estaba el error
+        }
+        
+        if (mounted) {
+          if (widget.originScreen == 'audit') {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const AuditoriaScreen()),
+              (route) => false,
+            );
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const MobilesScreen()),
+              (route) => false,
+            );
+          }
+        }
+      },
+    child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: FutureBuilder<VehicleDetail>(
+            future: _vehicleDetailFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                _animationController.repeat();
+                return Center(
+                  child: AnimatedTruckProgress(
+                    animation: _animationController,
+                  ),
+                );
+              }
+      
+              _animationController.stop();
+      
+              if (snapshot.hasError) {
+                return Center(
+                    child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Text('Error al cargar los detalles: ${snapshot.error}', textAlign: TextAlign.center)));
+              }
+      
+              if (snapshot.hasData) {
+                final vehicleDetail = snapshot.data!;
+                return _buildContent(context, vehicleDetail);
+              }
+      
+              return const Center(child: Text('No hay datos disponibles.'));
+            },
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context, VehicleDetail vehicle) {
-    return Column(
-      children: [
-        _buildCustomAppBar(context, vehicle),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
-              _buildTopStatusCard(vehicle),
-              const SizedBox(height: 24),
-              _buildSectionTitle('Reportabilidad'),
-              _buildDataRow('Último reporte', _formatDate(vehicle.lastReport)),
-              const SizedBox(height: 12),
-              _buildDataRow('Ubicación', _address ?? 'Obteniendo dirección...'),
-              const SizedBox(height: 24),
-              _buildSectionTitle('Seguridad'),
-              _buildDataRow('Alimentación', vehicle.batteryVolt != null ? '${vehicle.batteryVolt} V' : 'Sin datos'),
-              const SizedBox(height: 12),
-              _buildDataRow('Corte de combustible', vehicle.fuelCutoff.isNotEmpty ? vehicle.fuelCutoff : 'Sin datos'),
-              const SizedBox(height: 40),
-              _buildActionButtons(context),
-            ],
-          ),
-        ),
-      ],
-    );
+  Future<bool> _showExitConfirmation() async {
+    // Aquí implementas tu lógica para determinar si se debe recargar
+    // Por ejemplo, si hubo cambios en los datos
+    return true; // Cambia esto según tu lógica
   }
+
   
-  // --- El resto de tus widgets no necesitan cambios ---
-  // ... (todos los demás widgets _build... se mantienen igual)
+
+Widget _buildContent(BuildContext context, VehicleDetail vehicle) {
+  return Column(
+    children: [
+      _buildCustomAppBar(context, vehicle),
+      Expanded(
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            _buildTopStatusCard(vehicle),
+            const SizedBox(height: 24),
+            _buildSectionTitle('Reportabilidad'),
+            _buildDataRow('Último reporte', _formatDate(vehicle.lastReport)),
+            const SizedBox(height: 12),
+            _buildDataRow('Ubicación', _address ?? 'Obteniendo dirección...'),
+            const SizedBox(height: 24),
+            _buildSectionTitle('Seguridad'),
+            _buildDataRow('Alimentación', vehicle.batteryVolt != null ? '${vehicle.batteryVolt} V' : 'Sin datos'),
+            const SizedBox(height: 12),
+            _buildDataRow('Corte de combustible', vehicle.fuelCutoff.isNotEmpty ? vehicle.fuelCutoff : 'Sin datos'),
+            
+            // Sección de Accesorios con FutureBuilder
+            const SizedBox(height: 24),
+            _buildSectionTitle('Accesorios'),
+            _buildAccessoriesSection(),
+            
+            const SizedBox(height: 40),
+            _buildActionButtons(context),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildAccessoriesSection() {
+  return FutureBuilder<VehicleAccessories?>(
+    future: _accessoriesFuture,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      
+      if (snapshot.hasError) {
+        return _buildDataRow('Estado', 'Error cargando accesorios');
+      }
+      
+      if (!snapshot.hasData || snapshot.data!.accessories.isEmpty) {
+        return _buildDataRow('Estado', 'Sin accesorios disponibles');
+      }
+      
+      return _buildAccessoriesCard(snapshot.data!.accessories);
+    },
+  );
+}
+Widget _buildAccessoriesCard(Map<String, String> accessories) {
+  return Card(
+    color: Colors.white,
+    elevation: 2,
+    shadowColor: Colors.black12,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(15.0),
+      side: BorderSide(color: Colors.grey.shade300, width: 1.0),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: accessories.entries.map((entry) {
+          final isOpen = entry.value.toLowerCase().contains('abierta');
+          final icon = isOpen ? Icons.lock_open : Icons.lock;
+          final color = isOpen ? Colors.red : Colors.green;
+          final isTemp = entry.value.toLowerCase().contains('temperatura');
+          
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              children: [
+                Icon(icon, color: isTemp ? Colors.blue : color, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    entry.value,
+                    style: TextStyle(
+                      color: isTemp ? Colors.blue : (isOpen ? Colors.red : Colors.black),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    ),
+  );
+}
 
   Widget _buildCustomAppBar(BuildContext context, VehicleDetail vehicle) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Image.asset('assets/images/backbtn.png', width: 40, height: 40),
-          ),
+      GestureDetector(
+  onTap: () {
+    _animationController.stop(); // Detener animación
+    if (widget.onDataChanged != null) {
+      widget.onDataChanged!();
+    }
+    Navigator.pop(context); // Navegación simple
+  },
+  child: Image.asset('assets/images/backbtn.png', width: 40, height: 40),
+),
           Expanded(
             child: Center(
               child: Row(
@@ -333,6 +481,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> with SingleTi
             ),
           ),
         ),
+                const SizedBox(height: 20),
+
       ],
     );
   }

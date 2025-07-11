@@ -235,7 +235,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 Align(
                   alignment: Alignment.bottomCenter,
                   child: Container(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _saveSettings,

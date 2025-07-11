@@ -33,7 +33,11 @@
             android:value="2" />
 
         <meta-data android:name="com.google.android.geo.API_KEY"
-           android:value="AIzaSyCzqS7LjwPqINwVO1B7uWv4ZntOCeg__kQ"/>
+           android:value="AIzaSyAqL4xwW8mB3pxuhnx7lq8ZwCAhapcE1vA"/>
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
             
         <provider
             android:name="androidx.core.content.FileProvider"

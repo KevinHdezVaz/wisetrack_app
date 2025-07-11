@@ -109,7 +109,7 @@ Future<void> _login() async {
             }
           } catch (e) {
             // Si el parseo falla, usa el mensaje por defecto
-            errorMessage = 'Error al iniciar sesión, Usuario o contraseña incorrectos.';
+            errorMessage = 'Error al iniciar sesión, Intentalo de nuevo mas tarde.';
           }
         }
 

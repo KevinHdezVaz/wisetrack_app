@@ -97,10 +97,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
               _buildFilterSection('Posición', ['Válida', 'Inválida']),
               _buildFilterSection('Conexión', ['Online', 'Offline']),
               _buildFilterSection('Estado de motor', ['Encendido', 'Apagado']),
-              _buildFilterSection(
-                  'Filtro 1', ['Opción A', 'Opción B', 'Opción C', 'Opción D']),
-              _buildFilterSection(
-                  'Filtro 2', ['Opción E', 'Opción F', 'Opción G']),
+         
               const SizedBox(height: 16.0),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,

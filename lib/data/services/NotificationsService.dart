@@ -77,7 +77,6 @@ class NotificationService {
   }
 
 
-/// Actualiza un único permiso de notificación con el formato específico requerido
 static Future<bool> updateSingleNotificationPermission({
   required String name,
   required bool value,

@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:wisetrack_app/data/services/UserCacheService.dart';
+import 'package:wisetrack_app/data/services/notification_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 
 import '../../data/models/User/UserDetail.dart';
@@ -74,6 +78,66 @@ class AppDrawer extends StatelessWidget {
                     title: 'Configuraciones',
                     routeName: '/settings',
                   ),
+                  const Divider(),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Text(
+                      'Información de Depuración',
+                      style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  ValueListenableBuilder<String?>(
+                    valueListenable: NotificationServiceFirebase.fcmTokenNotifier,
+                    builder: (context, fcmToken, child) {
+                      return ListTile(
+                        leading: Icon(
+                          fcmToken == null || fcmToken.contains('Error') || fcmToken.contains('denegado') || fcmToken.contains('No disponible')
+                              ? Icons.warning_amber_rounded
+                              : Icons.check_circle_outline,
+                          color: fcmToken == null || fcmToken.contains('Error') || fcmToken.contains('denegado') || fcmToken.contains('No disponible')
+                              ? Colors.red
+                              : Colors.green,
+                        ),
+                        title: const Text('Estado de Notificaciones'),
+                        subtitle: SelectableText(
+                          fcmToken ?? 'Obteniendo token...',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.copy, size: 20.0),
+                          tooltip: 'Copiar Token',
+                          onPressed: (fcmToken == null || fcmToken.contains("No disponible") || fcmToken.contains("Error") || fcmToken.contains("denegado"))
+                              ? null
+                              : () {
+                                  Clipboard.setData(ClipboardData(text: fcmToken));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Token copiado al portapapeles'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                        ),
+                      );
+                    },
+                  ),
+
+                   ValueListenableBuilder<String?>(
+                  valueListenable: NotificationServiceFirebase.apnsTokenNotifier,
+                  builder: (context, token, child) {
+                    // Solo muestra este widget en iOS
+                    if (!Platform.isIOS) return const SizedBox.shrink();
+                    
+                    return _buildTokenTile(
+                      context: context,
+                      title: 'APNs Token (Apple)',
+                      token: token,
+                      icon: Icons.apple,
+                      color: Colors.black87,
+                    );
+                  },
+                ),
+                
                 ],
               ),
             ),
@@ -95,6 +159,40 @@ class AppDrawer extends StatelessWidget {
             _buildFooter(),
           ],
         ),
+      ),
+    );
+  }
+
+  // Widget reutilizable para mostrar un token
+  Widget _buildTokenTile({
+    required BuildContext context,
+    required String title,
+    required String? token,
+    required IconData icon,
+    required Color color,
+  }) {
+    final bool hasError = token == null || token.contains('Error') || token.contains('denegado') || token.contains('No disponible');
+    
+    return ListTile(
+      leading: Icon(
+        hasError ? Icons.warning_amber_rounded : icon,
+        color: hasError ? Colors.red : color,
+      ),
+      title: Text(title),
+      subtitle: SelectableText(
+        token ?? 'Obteniendo...',
+        style: const TextStyle(fontSize: 12, color: Colors.black54),
+        maxLines: 3,
+      ),
+      trailing: IconButton(
+        icon: const Icon(Icons.copy, size: 20.0),
+        tooltip: 'Copiar Token',
+        onPressed: hasError ? null : () {
+          Clipboard.setData(ClipboardData(text: token));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$title copiado')),
+          );
+        },
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart'; // Import for debugPrint
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:wisetrack_app/data/models/vehicles/Vehicle.dart'; // Importa tus modelos de Vehicle
+import 'package:wisetrack_app/data/models/vehicles/VehicleAccesories.dart';
 import 'package:wisetrack_app/data/models/vehicles/VehicleDetail.dart';
 import 'package:wisetrack_app/data/models/vehicles/VehicleHistoryPoint.dart';
 import 'package:wisetrack_app/utils/TokenStorage.dart';
@@ -49,6 +50,30 @@ class VehicleService {
       throw Exception('Vehicle request failed: $e');
     }
   }
+  
+
+  static Future<VehicleAccessories> getVehicleAccessories(String plate) async {
+  final url = Uri.parse('${Constants.baseUrl}/vehicle/get-accessories/$plate');
+  debugPrint('VehicleService: Realizando GET a: $url para accesorios de placa: $plate');
+  
+  try {
+    final response = await http.get(
+      url,
+      headers: await _getAuthHeaders(),
+    );
+
+    debugPrint('VehicleService: Respuesta GET ${response.statusCode}: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return VehicleAccessories.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load vehicle accessories: ${response.statusCode} - ${response.body}');
+    }
+  } catch (e) {
+    debugPrint('VehicleService: Error en getVehicleAccessories para $plate: $e');
+    throw Exception('Vehicle accessories request failed: $e');
+  }
+}
 
   // 2. GET VEHICLE DETAIL BY PLATE
    static Future<VehicleDetail> getVehicleDetail(String plate) async {

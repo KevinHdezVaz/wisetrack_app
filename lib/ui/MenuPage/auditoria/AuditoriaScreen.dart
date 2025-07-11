@@ -36,14 +36,13 @@ class _AuditoriaScreenState extends State<AuditoriaScreen>
     _fetchInitialData();
   }
 
-  @override
-  void dispose() {
-    _searchController.removeListener(_applyFilters);
-    _searchController.dispose();
-    _animationController.dispose();
-    super.dispose();
-  }
-
+@override
+void dispose() {
+  _animationController.stop();  // Detener la animación primero
+  _animationController.dispose(); // Luego disponer el controlador
+  _searchController.dispose();
+  super.dispose();
+}
   Future<void> _fetchInitialData() async {
     setState(() {
       _isLoading = true;
@@ -282,7 +281,11 @@ class _AuditoriaScreenState extends State<AuditoriaScreen>
           child: Row(
             children: [
               GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
+                onTap: () {
+                  
+                                  _animationController.stop(); // Detener animación antes de navegar
+Navigator.of(context).pop();
+  },
                 child: Image.asset(
                   'assets/images/backbtn.png',
                   width: 40,
@@ -381,8 +384,11 @@ class _AuditoriaScreenState extends State<AuditoriaScreen>
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => VehicleDetailScreen(plate: vehicle.plate),
-          ),
+ builder: (context) => VehicleDetailScreen(
+            plate: vehicle.plate,
+            originScreen: 'audit', // Bandera de origen diferente
+            onDataChanged: _refreshVehicles,
+          ),          ),
         );
       },
       child: Padding(

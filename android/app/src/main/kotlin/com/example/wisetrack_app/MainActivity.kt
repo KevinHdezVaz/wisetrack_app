@@ -1,4 +1,4 @@
-package com.example.wisetrack_app
+package cl.wisetrack.mobileAndroid
 
 import io.flutter.embedding.android.FlutterActivity
 

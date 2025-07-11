@@ -13,8 +13,10 @@ import 'dart:async';
 // Importaciones de la aplicación
 import 'package:wisetrack_app/data/models/vehicles/Vehicle.dart';
 import 'package:wisetrack_app/data/models/vehicles/VehiclePositionModel.dart';
+import 'package:wisetrack_app/data/services/NotificationsService.dart';
 import 'package:wisetrack_app/data/services/VehicleServicePosition.dart';
 import 'package:wisetrack_app/data/services/auth_api_service.dart';
+import 'package:wisetrack_app/data/services/notification_service.dart';
 import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/AppDrawer.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/FilterBottomSheet.dart';
@@ -27,6 +29,7 @@ import 'package:wisetrack_app/utils/TokenStorage.dart';
 import 'dart:ui' as ui;
 import 'dart:math' show pi;
 import '../../data/services/UserService.dart';
+import 'package:location/location.dart' as loc;
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -63,6 +66,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   final _markerCache = <String, BitmapDescriptor>{};
 
   bool _isLoggingOut = false;
+  CameraPosition _initialCameraPosition = const CameraPosition(
+    target: LatLng(-32.775,
+        -71.229),  
+    zoom: 8.0,
+  );
 
   @override
   void initState() {
@@ -76,11 +84,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     _searchFocusNode.addListener(_onSearchFocusChange);
     _searchController.addListener(_filterVehicles);
 
-    _initializeDashboardData();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _requestLocationPermissionAndAnimate();
-    });
+    // Llama a una única función que orquesta todo el inicio.
+    _initializeApp();
   }
 
   @override
@@ -89,6 +94,28 @@ class _DashboardScreenState extends State<DashboardScreen>
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _initializeApp() async {
+    // 1. Muestra el indicador de carga.
+    setState(() => _isLoading = true);
+    _animationController.repeat();
+
+    // 2. Primero, intenta obtener permisos y la ubicación del usuario.
+    await _centerOnUserLocation();
+
+    // 3. Después, carga todos los datos de los vehículos.
+    await _initializeDashboardData();
+
+    final notificationService = NotificationServiceFirebase();
+    await notificationService.initAndSendDeviceData();
+
+    // 5. Oculta el indicador de carga (esto se puede mover
+    // dentro de _initializeDashboardData al final si prefieres).
+    if (mounted) {
+      setState(() => _isLoading = false);
+      _animationController.stop();
+    }
   }
 
 // Se ha reducido el tamaño y el padding para que quepan mejor.
@@ -540,23 +567,37 @@ class _DashboardScreenState extends State<DashboardScreen>
           drawer: AppDrawer(onLogout: _logout),
           body: Stack(
             children: [
-              GoogleMap(
-                mapType: MapType.normal,
-                initialCameraPosition: const CameraPosition(
-                    target: LatLng(-32.775, -71.229), zoom: 8.0),
-                onMapCreated: (GoogleMapController controller) {
-                  if (!_mapController.isCompleted) {
-                    _mapController.complete(controller);
-                  }
-                },
-                markers: _markers,
-                myLocationEnabled: true,
-                myLocationButtonEnabled: false,
-                zoomControlsEnabled: false,
-                onTap: (_) => _searchFocusNode.unfocus(),
+               if (!_isLoading)
+            GoogleMap(
+              mapType: MapType.normal,
+              initialCameraPosition: _initialCameraPosition,
+              onMapCreated: (GoogleMapController controller) {
+                if (!_mapController.isCompleted) {
+                  _mapController.complete(controller);
+                }
+              },
+              markers: _markers,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              onTap: (_) => _searchFocusNode.unfocus(),
+            ),
+          
+          // Muestra la barra de búsqueda y botones solo si no está cargando
+          if (!_isLoading) _buildTopSearchBar(),
+          if (!_isLoading) _buildFloatingActionButtons(),
+
+          // El indicador de carga se muestra encima de todo cuando es necesario.
+          if (_isLoading || _isLoggingOut)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.5),
+                child: AnimatedTruckProgress(animation: _animationController),
               ),
-              if (!_isLoading) _buildTopSearchBar(),
-              if (!_isLoading) _buildFloatingActionButtons(),
+            ),
+     
+ 
+            
             ],
           ),
         ),
@@ -642,6 +683,60 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       ),
     );
+  }
+
+  /// **CORREGIDO**: Lógica de permisos y ubicación simplificada y robusta.
+  Future<void> _centerOnUserLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Para continuar, por favor activa el GPS.'),
+        ));
+      }
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Los permisos de ubicación son necesarios.')),
+          );
+        }
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text('Permisos bloqueados. Habilítalos en la configuración.'),
+        ));
+      }
+      await openAppSettings();
+      return;
+    }
+
+    try {
+      final Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      if (mounted) {
+        setState(() {
+          _initialCameraPosition = CameraPosition(
+            target: LatLng(position.latitude, position.longitude),
+            zoom: 8.0,
+          );
+        });
+      }
+    } catch (e) {
+      print("Error obteniendo ubicación: $e");
+    }
   }
 
 // En DashboardScreen.dart
@@ -797,74 +892,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  Future<void> _requestLocationPermissionAndAnimate() async {
-    // 1. Pide directamente el permiso. Esto mostrará el diálogo si es necesario.
-    PermissionStatus status = await Permission.location.request();
-
-    // 2. Imprime el estado real para depurar
-    print('Estado final del permiso de ubicación: $status');
-
-    // 3. Evalúa el estado devuelto
-    if (status.isGranted || status.isLimited) {
-      // isLimited es para iOS 14+
-      try {
-        Position newPosition = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-
-        // --- INICIO DE LA LÓGICA DE CACHÉ ---
-        bool hasMovedSignificantly = true;
-        if (_lastKnownPosition != null) {
-          final distanceInMeters = Geolocator.distanceBetween(
-            _lastKnownPosition!.latitude,
-            _lastKnownPosition!.longitude,
-            newPosition.latitude,
-            newPosition.longitude,
-          );
-          print(
-              "Distancia desde la última posición: ${distanceInMeters.toStringAsFixed(2)} metros.");
-          if (distanceInMeters < _locationChangeThreshold) {
-            hasMovedSignificantly = false;
-            print(
-                "El usuario no se ha movido lo suficiente. No se animará el mapa.");
-          }
-        }
-
-        if (hasMovedSignificantly) {
-          print("Actualizando la vista del mapa a la nueva ubicación.");
-          final GoogleMapController controller = await _mapController.future;
-          await controller.animateCamera(
-            CameraUpdate.newCameraPosition(
-              CameraPosition(
-                target: LatLng(newPosition.latitude, newPosition.longitude),
-                zoom: 8.0,
-              ),
-            ),
-          );
-          setState(() {
-            _lastKnownPosition = newPosition;
-          });
-        }
-        _updateUserLocationMarker(newPosition);
-      } catch (e) {
-        print("Error al obtener la ubicación: $e");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'No se pudo obtener la ubicación. Asegúrate de que tu GPS esté activado.'),
-            ),
-          );
-        }
-      }
-    } else if (status.isDenied) {
-      print("El usuario denegó el permiso de ubicación para esta sesión.");
-    } else if (status.isPermanentlyDenied) {
-      print(
-          "El permiso de ubicación fue denegado permanentemente. Abriendo configuración.");
-    }
-  }
-
   /// Actualiza o remueve el marcador de la ubicación actual del usuario.
   void _updateUserLocationMarker(Position position) {
     setState(() {
@@ -953,7 +980,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       CameraUpdate.newCameraPosition(
         CameraPosition(
           target: position,
-          zoom: 16.0,
+          zoom: 8.0,
         ),
       ),
     );
@@ -1035,7 +1062,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           const SizedBox(height: 16),
           GestureDetector(
-            onTap: _requestLocationPermissionAndAnimate,
+            onTap: _centerOnUserLocation,
             child: Container(
               width: 60,
               height: 60,

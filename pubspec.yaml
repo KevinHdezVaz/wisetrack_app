@@ -36,8 +36,15 @@ dependencies:
   image: ^4.5.4
   geocoding: ^3.0.0 # O la versión más reciente
   printing: ^5.6.0
-
-
+  location: ^8.0.0  #
+  firebase_core: ^2.15.0
+  firebase_auth: ^4.8.0
+  firebase_messaging: ^14.7.10
+  package_info_plus: ^8.0.0 # Para obtener la versión de la app
+  uuid: ^4.4.0                 # Para generar el ID único
+  flutter_dotenv: ^5.1.0 # 
+  image_picker: ^1.0.7  
+  flutter_image_compress: ^2.4.0
 
 dev_dependencies:
   flutter_test:
@@ -57,6 +64,7 @@ flutter:
     - assets/images/
     - assets/images/icons/
     - assets/fonts/
+    - .env # <-- AÑADE ESTA LÍNEA
     # Es buena práctica ser explícito con las imágenes para evitar errores
     # - assets/images/logo_w.png
     # - assets/images/splash_background.png

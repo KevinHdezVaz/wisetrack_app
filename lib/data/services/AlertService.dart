@@ -21,6 +21,53 @@ class AlertService {
 
 
 
+ static Future<bool> markAlertAsRead({
+    required String plate,
+    required String alertDate, // Usamos patente y fecha para identificar la alerta
+  }) async {
+    final url = Uri.parse('${Constants.baseUrl}/alert/mark-as-read');
+    
+    try {
+      final headers = await _getAuthHeaders();
+      final body = jsonEncode({
+        'plate': plate,
+        'alert_date': alertDate,
+        // El backend debería saber que al llamar a este endpoint, el status cambia a 1.
+      });
+
+      final response = await http.post(url, headers: headers, body: body);
+
+      if (response.statusCode == 200) {
+        debugPrint('AlertService: Alerta marcada como leída exitosamente.');
+        return true;
+      } else {
+        debugPrint('AlertService: Error al marcar como leída. Status: ${response.statusCode}, Body: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('AlertService: Excepción en markAlertAsRead: $e');
+      return false;
+    }
+  }
+  
+static Future<int> getUnreadAlertsCount() async {
+    try {
+      // Reutilizamos la función que ya obtiene todas las alertas
+      final allAlerts = await getAlerts();
+      
+      // Contamos cuántas alertas tienen status == 0 (no leídas)
+      final unreadCount = allAlerts.where((alert) => alert.status == 0).length;
+      
+      debugPrint('AlertService: Total de alertas: ${allAlerts.length}, No leídas: $unreadCount');
+      return unreadCount;
+
+    } catch (e) {
+      debugPrint('Error en getUnreadAlertsCount: $e');
+      return 0; // Si hay un error, devolvemos 0 para no romper la UI.
+    }
+  }
+
+
   /// Obtiene los tipos de alerta disponibles
   static Future<List<AlertType>> getAlertTypes() async {
     final url = Uri.parse('${Constants.baseUrl}/alert/get-types');

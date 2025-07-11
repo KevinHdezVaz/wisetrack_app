@@ -9,6 +9,7 @@ import 'package:wisetrack_app/data/models/alert/NotificationPermissions.dart';
 import 'package:wisetrack_app/data/services/UserCacheService.dart';
 import 'package:wisetrack_app/utils/TokenStorage.dart';
 import 'package:wisetrack_app/utils/constants.dart';
+import 'package:http_parser/http_parser.dart';
 
 // Custom Log class for logging
 class Log {
@@ -84,81 +85,66 @@ class UserService {
   }
 }
 
-  static Future<UserDetailResponse> updateUserProfile({
-    required String username,
-    required String name,
-    required String company,
-    required dynamic image, // Changed to dynamic to handle File or String (URL)
-    String? lastname,
-    String? phone,
-  }) async {
-    Log.i(_tag, 'Starting updateUserProfile request');
+  // En UserService.dart
 
-    final token = await _getTokenWithValidation();
-    final url = Uri.parse('${Constants.baseUrl}/user/update');
+// --- CAMBIO 1: El tipo de retorno ahora es Future<void> (no devuelve nada) ---
+static Future<void> updateUserProfile({
+  required String username,
+  required String name,
+  required String company,
+  required File image,
+  String? lastname,
+  String? phone,
+}) async {
+  Log.i(_tag, 'Starting updateUserProfile request');
 
-    try {
-      // Validate and prepare the image file
-      File imageFile;
-      if (image is File) {
-        // Check if the file exists
-        if (!await image.exists()) {
-          Log.e(_tag, 'Image file does not exist: ${image.path}');
-          throw Exception('Image file does not exist');
-        }
-        imageFile = image;
-      } else if (image is String && Uri.parse(image).isAbsolute) {
-        // Handle URL: Download the image to a temporary file
-        Log.i(_tag, 'Downloading image from URL: $image');
-        imageFile = await _downloadImage(image);
-      } else {
-        Log.e(_tag, 'Invalid image parameter: $image');
-        throw Exception('Image must be a File or a valid URL');
-      }
+  final token = await _getTokenWithValidation();
+  final url = Uri.parse('${Constants.baseUrl}/user/update');
 
-      Log.d(_tag, 'Preparing multipart request for URL: $url');
-      var request = http.MultipartRequest('POST', url)
-        ..headers['Authorization'] = 'Token $token'
-        ..fields['username'] = username
-        ..fields['name'] = name
-        ..fields['company'] = company
-        ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+  try {
+    final imageFile = image;
 
-      if (lastname != null) {
-        request.fields['lastname'] = lastname;
-        Log.d(_tag, 'Added lastname to request: $lastname');
-      }
-      if (phone != null) {
-        request.fields['phone'] = phone;
-        Log.d(_tag, 'Added phone to request: $phone');
-      }
+    var request = http.MultipartRequest('POST', url)
+      ..headers['Authorization'] = 'Token $token'
+      ..fields['username'] = username
+      ..fields['name'] = name
+      ..fields['company'] = company;
 
-      Log.d(_tag, 'Sending multipart request with fields: ${request.fields}');
-      final response = await request.send()
-          .timeout(const Duration(seconds: 20));
-      final responseBody = await response.stream.bytesToString();
-
-      Log.i(_tag, 'Received response with status: ${response.statusCode}');
-      Log.d(_tag, 'Response body: $responseBody');
-
-      if (response.statusCode == 200) {
-        return UserDetailResponse.fromJson(json.decode(responseBody));
-      } else {
-        throw _handleErrorResponse(
-          http.Response(responseBody, response.statusCode)
-        );
-      }
-    } on SocketException catch (e, stackTrace) {
-      Log.e(_tag, 'SocketException occurred: ${e.message}', e, stackTrace);
-      throw Exception('Error de conexión: ${e.message}');
-    } on TimeoutException catch (e, stackTrace) {
-      Log.e(_tag, 'Request timed out after 20 seconds', e, stackTrace);
-      throw Exception('El servidor no respondió a tiempo');
-    } catch (e, stackTrace) {
-      Log.e(_tag, 'Error updating profile: $e', e, stackTrace);
-      throw Exception('Error al actualizar perfil: $e');
+    if (lastname != null) {
+      request.fields['lastname'] = lastname;
     }
+    if (phone != null) {
+      request.fields['phone'] = phone;
+    }
+
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'image',
+        imageFile.path,
+        contentType: MediaType('image', 'jpeg'),
+      ),
+    );
+
+    final response = await request.send().timeout(const Duration(seconds: 20));
+    final responseBody = await response.stream.bytesToString();
+
+    Log.i(_tag, 'Received response with status: ${response.statusCode}');
+    Log.d(_tag, 'Response body: $responseBody');
+
+    // --- CAMBIO 2: Si la respuesta es exitosa, simplemente salimos de la función ---
+    if (response.statusCode == 200) {
+      // No intentamos procesar el JSON, solo confirmamos que fue exitoso.
+      return; 
+    } else {
+      // Si falla, lanzamos la excepción como antes.
+      throw _handleErrorResponse(http.Response(responseBody, response.statusCode));
+    }
+  } catch (e) {
+    Log.e(_tag, 'Error updating profile: $e');
+    // Re-lanzamos la excepción para que la pantalla la pueda manejar.
+    rethrow;
   }
+}
 
   // Utility to download an image from a URL to a temporary file
   static Future<File> _downloadImage(String url) async {
@@ -207,16 +193,26 @@ class UserService {
     }
   }
 
-  static Exception _handleErrorResponse(http.Response response) {
-    Log.e(_tag, 'Handling error response with status: ${response.statusCode}');
-    try {
-      final error = json.decode(response.body)['error'] ?? 'Error desconocido';
-      Log.d(_tag, 'Error message from server: $error');
-      return Exception('${response.statusCode}: $error');
-    } catch (e, stackTrace) {
-      Log.e(_tag, 'Failed to parse error response: $e', e, stackTrace);
-      return Exception('Error ${response.statusCode}');
-    }
+// En UserService.dart
+
+static Exception _handleErrorResponse(http.Response response) {
+  Log.e(_tag, 'Handling error response with status: ${response.statusCode}');
+  try {
+    // Intenta decodificar el JSON de la respuesta
+    final data = json.decode(response.body);
+    
+    // --- CAMBIO AQUÍ ---
+    // Busca en varias claves comunes ('message', 'error', 'detail') para encontrar el mensaje.
+    final errorMessage = data['message'] ?? data['error'] ?? data['detail'] ?? 'Error desconocido desde el servidor';
+
+    Log.d(_tag, 'Parsed error message from server: $errorMessage');
+    return Exception('${response.statusCode}: $errorMessage');
+
+  } catch (e) {
+    Log.e(_tag, 'Failed to parse JSON error response: $e');
+    // Si la respuesta no es JSON (como un error 502 HTML), devuelve un error genérico
+    return Exception('Error ${response.statusCode}: Respuesta inválida del servidor.');
   }
+}
 }
  

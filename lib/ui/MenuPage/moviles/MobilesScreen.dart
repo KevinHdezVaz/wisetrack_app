@@ -397,15 +397,23 @@ class _MobilesScreenState extends State<MobilesScreen>
     bool isKeyActive = false; // Reemplazar con lógica real si está disponible
     bool isShieldActive = false; // Reemplazar con lógica real si está disponible
 
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VehicleDetailScreen(plate: vehicle.plate),
+   return InkWell(
+    onTap: () async {
+      final shouldRefresh = await Navigator.push(
+        context,
+        MaterialPageRoute(
+  builder: (context) => VehicleDetailScreen(
+            plate: vehicle.plate,
+            originScreen: 'mobiles', // Bandera de origen
+            onDataChanged: _refreshVehicles,
           ),
-        );
-      },
+                  ),
+      );
+      
+      if (shouldRefresh == true && mounted) {
+        _refreshVehicles(); // Recargar la lista
+      }
+    },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 18.0),
         child: Row(

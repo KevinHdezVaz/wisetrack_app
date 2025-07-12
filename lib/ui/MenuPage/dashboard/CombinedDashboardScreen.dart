@@ -2,11 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:wisetrack_app/ui/MenuPage/dashboard/BalanceScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/dashboard/DataVisualizationScreen.dart';
 
-// Importa los widgets de contenido y los modelos que hemos creado/usado
-// import 'balance_content.dart';
-// import 'data_visualization_content.dart';
-// import 'app_colors.dart';
-
 class CombinedDashboardScreen extends StatefulWidget {
   const CombinedDashboardScreen({Key? key}) : super(key: key);
 
@@ -16,7 +11,6 @@ class CombinedDashboardScreen extends StatefulWidget {
 }
 
 class _CombinedDashboardScreenState extends State<CombinedDashboardScreen> {
-  // 0 para "Balance de Hoy", 1 para "Dashboard"
   int _selectedTabIndex = 0;
 
   final List<String> _titles = ['Balance de Hoy', 'Dashboard'];
@@ -34,7 +28,6 @@ class _CombinedDashboardScreenState extends State<CombinedDashboardScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: _buildBackButton(context),
-        // El título cambia según la pestaña seleccionada
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -60,8 +53,6 @@ class _CombinedDashboardScreenState extends State<CombinedDashboardScreen> {
         children: [
           _buildCustomTabBar(),
           Expanded(
-            // IndexedStack muestra solo el widget correspondiente al índice actual
-            // pero mantiene el estado de los otros widgets en memoria.
             child: IndexedStack(
               index: _selectedTabIndex,
               children: _tabContents,
@@ -124,8 +115,6 @@ class _CombinedDashboardScreenState extends State<CombinedDashboardScreen> {
   }
 }
 
-// --- Clases y widgets de soporte que ya tenías ---
-// (Debes tenerlas importadas o definidas en los mismos archivos)
 class AppColors {
   static const Color primary = Color(0xFF00636A);
 }

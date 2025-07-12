@@ -101,13 +101,11 @@ class OnboardingscreenThree extends StatelessWidget {
         ),
         ElevatedButton(
           onPressed: () async {
-            // Mark onboarding as seen
             try {
               await Preferences.setOnboardingSeen();
             } catch (e) {
               print('Error setting onboarding status: $e');
             }
-            // Navigate to LoginScreen using named route
             Navigator.pushReplacementNamed(context, '/login');
           },
           style: ElevatedButton.styleFrom(

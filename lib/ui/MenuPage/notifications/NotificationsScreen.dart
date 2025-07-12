@@ -16,7 +16,8 @@ class NotificationsScreen extends StatefulWidget {
   _NotificationsScreenState createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> with SingleTickerProviderStateMixin {
+class _NotificationsScreenState extends State<NotificationsScreen>
+    with SingleTickerProviderStateMixin {
   bool _isLoading = true;
   String? _errorMessage;
   late AnimationController _animationController;
@@ -30,7 +31,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
   List<Alertas> _previouslyAlerts = [];
   Set<String> _readAlertIds = {};
 
-  NotificationPermissions? _notificationPermissions; // Store notification permissions
+  NotificationPermissions?
+      _notificationPermissions; // Store notification permissions
 
   final Map<String, List<String>> _alertCategories = {
     'Velocidad': ['Velocidad Maxima'],
@@ -46,7 +48,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(vsync: this, duration: const Duration(seconds: 5));
+    _animationController =
+        AnimationController(vsync: this, duration: const Duration(seconds: 5));
     _fetchInitialData();
   }
 
@@ -68,16 +71,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
 
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => NotificationDetailScreen(alert: alert)),
+      MaterialPageRoute(
+          builder: (context) => NotificationDetailScreen(alert: alert)),
     );
   }
 
   void _generateFiltersFromAlerts(List<Alertas> alerts) {
-    // Get unique alert types that are allowed by notification permissions
     final availableTypes = alerts
         .map((alert) => alert.alertType.name)
         .toSet()
-        .where((type) => _isAlertTypeAllowed(type)) // Filter based on permissions
+        .where(
+            (type) => _isAlertTypeAllowed(type)) // Filter based on permissions
         .toList();
 
     setState(() {
@@ -86,27 +90,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
   }
 
   bool _isAlertTypeAllowed(String alertType) {
-    if (_notificationPermissions == null || !_notificationPermissions!.allowNotification) {
+    if (_notificationPermissions == null ||
+        !_notificationPermissions!.allowNotification) {
       return false; // If notifications are disabled globally, no alerts are allowed
     }
-
-    // Check if the specific alert type is enabled in permissions
     final permissions = _notificationPermissions!.alertPermissions;
     return permissions.maxSpeed && alertType == 'Velocidad Maxima' ||
         permissions.shortBreak && alertType == 'descanso corto' ||
-        permissions.noArrivalAtDestination && alertType == 'No presentación en destino' ||
+        permissions.noArrivalAtDestination &&
+            alertType == 'No presentación en destino' ||
         permissions.tenHoursDriving && alertType == 'conduccion 10 Horas' ||
         permissions.continuousDriving && alertType == 'conduccion continua';
   }
 
   void _applyFiltersAndGroup() {
-    // Filter alerts based on notification permissions
-    List<Alertas> filteredAlerts = _allAlerts.where((alert) => _isAlertTypeAllowed(alert.alertType.name)).toList();
-
-    // Apply additional filter based on selected chip
+    List<Alertas> filteredAlerts = _allAlerts
+        .where((alert) => _isAlertTypeAllowed(alert.alertType.name))
+        .toList();
     if (_selectedFilterIndex != 0) {
       final selectedType = _filters[_selectedFilterIndex];
-      filteredAlerts = filteredAlerts.where((alert) => alert.alertType.name == selectedType).toList();
+      filteredAlerts = filteredAlerts
+          .where((alert) => alert.alertType.name == selectedType)
+          .toList();
     }
 
     final now = DateTime.now();
@@ -114,13 +119,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
 
     _todayAlerts = filteredAlerts.where((alert) {
       if (alert.alertDate == null) return false;
-      final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
+      final alertDay = DateTime(
+          alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
       return alertDay.isAtSameMomentAs(today);
     }).toList();
 
     _previouslyAlerts = filteredAlerts.where((alert) {
       if (alert.alertDate == null) return true;
-      final alertDay = DateTime(alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
+      final alertDay = DateTime(
+          alert.alertDate!.year, alert.alertDate!.month, alert.alertDate!.day);
       return !alertDay.isAtSameMomentAs(today);
     }).toList();
 
@@ -136,7 +143,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         AlertService.getAlerts(),
         AlertService.getAlertTypes(),
         ReadStatusManager.getReadAlertIds(),
-        NotificationService.getNotificationPermissions(), // Fetch notification permissions
+        NotificationService
+            .getNotificationPermissions(), // Fetch notification permissions
       ]);
 
       final alerts = results[0] as List<Alertas>;
@@ -175,7 +183,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         elevation: 0,
         backgroundColor: Colors.white,
         leading: _buildBackButton(context),
-        title: const Text('Notificaciones', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: const Text('Notificaciones',
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: Stack(
@@ -184,12 +193,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
             children: [
               _buildFilterChips(),
               Expanded(
-                child: _isLoading ? const SizedBox.shrink() : _buildBodyContent(),
+                child:
+                    _isLoading ? const SizedBox.shrink() : _buildBodyContent(),
               ),
             ],
           ),
           if (_isLoading)
-            Center(child: AnimatedTruckProgress(animation: _animationController)),
+            Center(
+                child: AnimatedTruckProgress(animation: _animationController)),
         ],
       ),
     );
@@ -197,12 +208,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
 
   Widget _buildBodyContent() {
     if (_errorMessage != null) {
-      return Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)));
+      return Center(
+          child:
+              Text(_errorMessage!, style: const TextStyle(color: Colors.red)));
     }
-
-    // Check if notifications are globally disabled
-    if (_notificationPermissions != null && !_notificationPermissions!.allowNotification) {
-      return const Center(child: Text('Las notificaciones están desactivadas.'));
+    if (_notificationPermissions != null &&
+        !_notificationPermissions!.allowNotification) {
+      return const Center(
+          child: Text('Las notificaciones están desactivadas.'));
     }
 
     if (_todayAlerts.isEmpty && _previouslyAlerts.isEmpty) {
@@ -214,12 +227,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
       children: [
         if (_todayAlerts.isNotEmpty) ...[
           _buildSectionHeader('Hoy'),
-          ..._todayAlerts.map((alert) => _buildNotificationTile(alert)).toList(),
+          ..._todayAlerts
+              .map((alert) => _buildNotificationTile(alert))
+              .toList(),
         ],
         if (_previouslyAlerts.isNotEmpty) ...[
           const SizedBox(height: 16),
           _buildSectionHeader('Anteriormente'),
-          ..._previouslyAlerts.map((alert) => _buildNotificationTile(alert)).toList(),
+          ..._previouslyAlerts
+              .map((alert) => _buildNotificationTile(alert))
+              .toList(),
         ],
         _buildFooter(),
       ],
@@ -249,7 +266,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
               },
               backgroundColor: Colors.grey.shade200,
               selectedColor: AppColors.primary.withOpacity(0.1),
-              labelStyle: TextStyle(color: _selectedFilterIndex == index ? AppColors.primary : Colors.black87),
+              labelStyle: TextStyle(
+                  color: _selectedFilterIndex == index
+                      ? AppColors.primary
+                      : Colors.black87),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(color: Colors.grey.shade300),
@@ -273,8 +293,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     return ListTile(
       leading: CircleAvatar(
         radius: 25,
-        backgroundColor: isUnread ? AppColors.primary.withOpacity(0.1) : Colors.grey.shade200,
-        child: Icon(_getIconForAlert(alertType.name), color: AppColors.primary, size: 28),
+        backgroundColor: isUnread
+            ? AppColors.primary.withOpacity(0.1)
+            : Colors.grey.shade200,
+        child: Icon(_getIconForAlert(alertType.name),
+            color: AppColors.primary, size: 28),
       ),
       title: Row(
         children: [
@@ -287,10 +310,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
           ),
           if (isUnread) ...[
             const SizedBox(width: 6),
-            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+            Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                    color: Colors.red, shape: BoxShape.circle)),
           ],
           const SizedBox(width: 8),
-          Text(_formatAlertDate(alert.alertDate), style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+          Text(_formatAlertDate(alert.alertDate),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
         ],
       ),
       subtitle: Padding(
@@ -310,7 +338,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
   IconData _getIconForAlert(String alertName) {
     String name = alertName.toLowerCase();
     if (name.contains('velocidad')) return Icons.speed;
-    if (name.contains('conduccion') || name.contains('horas') || name.contains('continua')) return Icons.time_to_leave;
+    if (name.contains('conduccion') ||
+        name.contains('horas') ||
+        name.contains('continua')) return Icons.time_to_leave;
     if (name.contains('descanso')) return Icons.hotel;
     if (name.contains('destino')) return Icons.location_on;
     return Icons.notifications;

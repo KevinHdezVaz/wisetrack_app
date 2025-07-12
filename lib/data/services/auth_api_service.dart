@@ -7,7 +7,6 @@ import 'package:wisetrack_app/utils/TokenStorage.dart';
 import 'package:wisetrack_app/utils/constants.dart';
 
 class AuthService {
-  // Método para iniciar sesión (sin cambios)
   static Future<LoginResponse> login({
     required String username,
     required String password,
@@ -106,23 +105,19 @@ class AuthService {
       );
     }
   }
-  // --- El resto de la clase no necesita cambios ---
 
-  // Método auxiliar para obtener el token almacenado (sin cambios)
   static Future<String?> getStoredToken() async {
     final token = await TokenStorage.getToken();
     print('Obteniendo token almacenado: $token');
     return token;
   }
 
-  // Método para verificar si hay un token activo (sin cambios)
   static Future<bool> isLoggedIn() async {
     final hasToken = await TokenStorage.hasToken();
     print('Verificando si está logueado: $hasToken');
     return hasToken;
   }
 
-  // Paso 1: Solicitar reset (GET) (sin cambios)
   static Future<PasswordResetResponse> requestPasswordReset(
       String email) async {
     final url = Uri.parse('${Constants.baseUrl}/user/reset-password/$email');
@@ -218,7 +213,6 @@ class AuthService {
     }
   }
 
-  // Paso 3: Cambiar contraseña (POST)
   static Future<PasswordResetResponse> setNewPassword({
     required String email,
     required String newPass,

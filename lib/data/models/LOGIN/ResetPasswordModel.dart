@@ -1,4 +1,3 @@
-// Modelo para solicitud inicial
 class PasswordResetRequest {
   final String email;
 
@@ -7,7 +6,6 @@ class PasswordResetRequest {
   Map<String, dynamic> toJson() => {'email': email};
 }
 
-// Modelo para validación MFA
 class MfaVerification {
   final String email;
   final String code;
@@ -17,7 +15,6 @@ class MfaVerification {
   Map<String, dynamic> toJson() => {'email': email, 'mfa': code};
 }
 
-// Modelo para cambio de contraseña
 class NewPasswordData {
   final String email;
   final String newPass;
@@ -36,7 +33,6 @@ class NewPasswordData {
       };
 }
 
-// Respuesta genérica
 class PasswordResetResponse {
   final bool success;
   final String? message;

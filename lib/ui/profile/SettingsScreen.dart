@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wisetrack_app/data/models/User/UserDetail.dart';
 import 'package:wisetrack_app/data/services/UserCacheService.dart';
- import 'package:wisetrack_app/data/services/UserService.dart';
+import 'package:wisetrack_app/data/services/UserService.dart';
 import 'package:wisetrack_app/data/services/NotificationsService.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/profile/EditProfileScreen.dart';
@@ -14,15 +14,11 @@ class SettingsScreen extends StatefulWidget {
   _SettingsScreenState createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProviderStateMixin {
-  // State for user data
+class _SettingsScreenState extends State<SettingsScreen>
+    with SingleTickerProviderStateMixin {
   UserData? _currentUser;
-  
-  // State for loading and animations
   bool _isLoading = true;
   late AnimationController _animationController;
-  
-  // State for notification settings
   bool _notificationsEnabled = false;
   bool _speedAlerts = false;
   bool _shortBreakAlerts = false;
@@ -46,11 +42,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     super.dispose();
   }
 
-  /// Loads all necessary data for the screen in parallel.
   Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
     try {
-      // Run the loading of notification settings and user data in parallel
       await Future.wait([
         _loadNotificationSettings(),
         _loadUserData(),
@@ -71,7 +65,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  /// Fetches user data, trying cache first, then network.
   Future<void> _loadUserData() async {
     final cachedUser = await UserCacheService.getCachedUserData();
     if (cachedUser != null) {
@@ -80,13 +73,10 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       }
       return; // Found in cache, no need to call network
     }
-
-    // If not in cache, fetch from network
     try {
       final userDetailResponse = await UserService.getUserDetail();
       if (mounted) {
         setState(() => _currentUser = userDetailResponse.data);
-        // Save to cache for next time
         await UserCacheService.saveUserData(userDetailResponse.data);
       }
     } catch (e) {
@@ -94,7 +84,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     }
   }
 
-  /// Fetches notification settings from the service.
   Future<void> _loadNotificationSettings() async {
     final permissions = await NotificationService.getNotificationPermissions();
     if (mounted) {
@@ -104,25 +93,30 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         _shortBreakAlerts = permissions.alertPermissions.shortBreak;
         _noArrivalAlerts = permissions.alertPermissions.noArrivalAtDestination;
         _tenHoursDrivingAlerts = permissions.alertPermissions.tenHoursDriving;
-        _continuousDrivingAlerts = permissions.alertPermissions.continuousDriving;
+        _continuousDrivingAlerts =
+            permissions.alertPermissions.continuousDriving;
       });
     }
   }
 
-  /// Saves all current settings to the backend.
   Future<void> _saveSettings() async {
     setState(() {
       _isLoading = true;
       _animationController.repeat();
     });
     try {
-      // This could also be parallelized with Future.wait if the API supports it
-      await NotificationService.updateSingleNotificationPermission(name: 'allow_notification', value: _notificationsEnabled);
-      await NotificationService.updateSingleNotificationPermission(name: 'Velocidad Maxima', value: _speedAlerts);
-      await NotificationService.updateSingleNotificationPermission(name: 'descanso corto', value: _shortBreakAlerts);
-      await NotificationService.updateSingleNotificationPermission(name: 'No presentación en destino', value: _noArrivalAlerts);
-      await NotificationService.updateSingleNotificationPermission(name: 'conduccion 10 Horas', value: _tenHoursDrivingAlerts);
-      await NotificationService.updateSingleNotificationPermission(name: 'conduccion continua', value: _continuousDrivingAlerts);
+      await NotificationService.updateSingleNotificationPermission(
+          name: 'allow_notification', value: _notificationsEnabled);
+      await NotificationService.updateSingleNotificationPermission(
+          name: 'Velocidad Maxima', value: _speedAlerts);
+      await NotificationService.updateSingleNotificationPermission(
+          name: 'descanso corto', value: _shortBreakAlerts);
+      await NotificationService.updateSingleNotificationPermission(
+          name: 'No presentación en destino', value: _noArrivalAlerts);
+      await NotificationService.updateSingleNotificationPermission(
+          name: 'conduccion 10 Horas', value: _tenHoursDrivingAlerts);
+      await NotificationService.updateSingleNotificationPermission(
+          name: 'conduccion continua', value: _continuousDrivingAlerts);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -168,39 +162,43 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           : Stack(
               children: [
                 ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 20.0),
                   children: [
-                    // --- DYNAMIC USER PROFILE TILE ---
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: CircleAvatar(
                         radius: 30,
-                        backgroundImage: _currentUser?.userImage != null && _currentUser!.userImage.isNotEmpty
+                        backgroundImage: _currentUser?.userImage != null &&
+                                _currentUser!.userImage.isNotEmpty
                             ? NetworkImage(_currentUser!.userImage)
-                            : const AssetImage('assets/images/default_avatar.png') as ImageProvider, // Fallback to a local asset
-                        onBackgroundImageError: (exception, stackTrace) {
-                           // Handle image load error if needed
-                        },
+                            : const AssetImage(
+                                    'assets/images/default_avatar.png')
+                                as ImageProvider, // Fallback to a local asset
+                        onBackgroundImageError: (exception, stackTrace) {},
                       ),
                       title: Text(
                         _currentUser?.fullName ?? 'Cargando...',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       subtitle: const Text('Editar perfil'),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                      trailing: const Icon(Icons.arrow_forward_ios,
+                          size: 16, color: Colors.grey),
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => EditProfileScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => EditProfileScreen()),
                         );
                       },
                     ),
                     const SizedBox(height: 24),
-                    // --- NOTIFICATION SETTINGS ---
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Notificaciones', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Text('Notificaciones',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
@@ -209,44 +207,63 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                             style: TextStyle(color: Colors.grey, fontSize: 14),
                           ),
                           value: _notificationsEnabled,
-                          onChanged: (bool value) => setState(() => _notificationsEnabled = value),
+                          onChanged: (bool value) =>
+                              setState(() => _notificationsEnabled = value),
                           activeColor: AppColors.primary,
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
-                    // --- ALERT TYPES ---
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Tipos de alertas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Text('Tipos de alertas',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        _buildSwitchTile('Velocidad Maxima', _speedAlerts, (val) => setState(() => _speedAlerts = val)),
-                        _buildSwitchTile('Descanso corto', _shortBreakAlerts, (val) => setState(() => _shortBreakAlerts = val)),
-                        _buildSwitchTile('No presentación en destino', _noArrivalAlerts, (val) => setState(() => _noArrivalAlerts = val)),
-                        _buildSwitchTile('Conducción 10 horas', _tenHoursDrivingAlerts, (val) => setState(() => _tenHoursDrivingAlerts = val)),
-                        _buildSwitchTile('Conducción continua', _continuousDrivingAlerts, (val) => setState(() => _continuousDrivingAlerts = val)),
+                        _buildSwitchTile('Velocidad Maxima', _speedAlerts,
+                            (val) => setState(() => _speedAlerts = val)),
+                        _buildSwitchTile('Descanso corto', _shortBreakAlerts,
+                            (val) => setState(() => _shortBreakAlerts = val)),
+                        _buildSwitchTile(
+                            'No presentación en destino',
+                            _noArrivalAlerts,
+                            (val) => setState(() => _noArrivalAlerts = val)),
+                        _buildSwitchTile(
+                            'Conducción 10 horas',
+                            _tenHoursDrivingAlerts,
+                            (val) =>
+                                setState(() => _tenHoursDrivingAlerts = val)),
+                        _buildSwitchTile(
+                            'Conducción continua',
+                            _continuousDrivingAlerts,
+                            (val) =>
+                                setState(() => _continuousDrivingAlerts = val)),
                       ],
                     ),
                     const SizedBox(height: 80), // Space for the floating button
                   ],
                 ),
-                // --- SAVE BUTTON ---
                 Align(
                   alignment: Alignment.bottomCenter,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 40, horizontal: 20),
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _saveSettings,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.0)),
                       ),
                       child: const Text(
                         'Guardar cambios',
-                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -256,8 +273,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  /// Helper widget to build a consistent switch tile.
-  Widget _buildSwitchTile(String title, bool value, ValueChanged<bool> onChanged) {
+  Widget _buildSwitchTile(
+      String title, bool value, ValueChanged<bool> onChanged) {
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),

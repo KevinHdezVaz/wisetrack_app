@@ -8,20 +8,16 @@ import 'package:wisetrack_app/ui/color/app_colors.dart';
 
 import '../../data/models/User/UserDetail.dart';
 
-// Ya no necesita ser StatefulWidget
 class AppDrawer extends StatelessWidget {
-  // 1. Acepta la función de callback en el constructor
   final VoidCallback onLogout;
-
-
   final VoidCallback? onNavigate;
 
   const AppDrawer({
     Key? key,
     required this.onLogout,
-    this.onNavigate, // <-- Añade esto
+    this.onNavigate,
   }) : super(key: key);
-  
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
@@ -31,7 +27,6 @@ class AppDrawer extends StatelessWidget {
           bottomRight: Radius.circular(30),
         ),
       ),
-      // Ya no necesita un Stack aquí
       child: Container(
         color: Colors.white,
         child: Column(
@@ -80,39 +75,54 @@ class AppDrawer extends StatelessWidget {
                   ),
                   const Divider(),
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     child: Text(
                       'Información de Depuración',
-                      style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                          color: Colors.grey, fontWeight: FontWeight.w500),
                     ),
                   ),
                   ValueListenableBuilder<String?>(
-                    valueListenable: NotificationServiceFirebase.fcmTokenNotifier,
+                    valueListenable:
+                        NotificationServiceFirebase.fcmTokenNotifier,
                     builder: (context, fcmToken, child) {
                       return ListTile(
                         leading: Icon(
-                          fcmToken == null || fcmToken.contains('Error') || fcmToken.contains('denegado') || fcmToken.contains('No disponible')
+                          fcmToken == null ||
+                                  fcmToken.contains('Error') ||
+                                  fcmToken.contains('denegado') ||
+                                  fcmToken.contains('No disponible')
                               ? Icons.warning_amber_rounded
                               : Icons.check_circle_outline,
-                          color: fcmToken == null || fcmToken.contains('Error') || fcmToken.contains('denegado') || fcmToken.contains('No disponible')
+                          color: fcmToken == null ||
+                                  fcmToken.contains('Error') ||
+                                  fcmToken.contains('denegado') ||
+                                  fcmToken.contains('No disponible')
                               ? Colors.red
                               : Colors.green,
                         ),
                         title: const Text('Estado de Notificaciones'),
                         subtitle: SelectableText(
                           fcmToken ?? 'Obteniendo token...',
-                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.black54),
                         ),
                         trailing: IconButton(
                           icon: const Icon(Icons.copy, size: 20.0),
                           tooltip: 'Copiar Token',
-                          onPressed: (fcmToken == null || fcmToken.contains("No disponible") || fcmToken.contains("Error") || fcmToken.contains("denegado"))
+                          onPressed: (fcmToken == null ||
+                                  fcmToken.contains("No disponible") ||
+                                  fcmToken.contains("Error") ||
+                                  fcmToken.contains("denegado"))
                               ? null
                               : () {
-                                  Clipboard.setData(ClipboardData(text: fcmToken));
+                                  Clipboard.setData(
+                                      ClipboardData(text: fcmToken));
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Token copiado al portapapeles'),
+                                      content:
+                                          Text('Token copiado al portapapeles'),
                                       duration: Duration(seconds: 2),
                                     ),
                                   );
@@ -121,23 +131,20 @@ class AppDrawer extends StatelessWidget {
                       );
                     },
                   ),
-
-                   ValueListenableBuilder<String?>(
-                  valueListenable: NotificationServiceFirebase.apnsTokenNotifier,
-                  builder: (context, token, child) {
-                    // Solo muestra este widget en iOS
-                    if (!Platform.isIOS) return const SizedBox.shrink();
-                    
-                    return _buildTokenTile(
-                      context: context,
-                      title: 'APNs Token (Apple)',
-                      token: token,
-                      icon: Icons.apple,
-                      color: Colors.black87,
-                    );
-                  },
-                ),
-                
+                  ValueListenableBuilder<String?>(
+                    valueListenable:
+                        NotificationServiceFirebase.apnsTokenNotifier,
+                    builder: (context, token, child) {
+                      if (!Platform.isIOS) return const SizedBox.shrink();
+                      return _buildTokenTile(
+                        context: context,
+                        title: 'APNs Token (Apple)',
+                        token: token,
+                        icon: Icons.apple,
+                        color: Colors.black87,
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -147,11 +154,8 @@ class AppDrawer extends StatelessWidget {
               icon: Icons.exit_to_app,
               title: 'Cerrar sesión',
               iconColor: AppColors.ColorFooter,
-              // 2. El onTap ahora simplemente llama al callback
               onTap: () {
-                // Primero cierra el drawer para que se vea la animación en la pantalla completa
-                Navigator.of(context).pop(); 
-                // Luego llama a la función de logout que vive en DashboardScreen
+                Navigator.of(context).pop();
                 onLogout();
               },
             ),
@@ -163,7 +167,6 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
-  // Widget reutilizable para mostrar un token
   Widget _buildTokenTile({
     required BuildContext context,
     required String title,
@@ -171,8 +174,10 @@ class AppDrawer extends StatelessWidget {
     required IconData icon,
     required Color color,
   }) {
-    final bool hasError = token == null || token.contains('Error') || token.contains('denegado') || token.contains('No disponible');
-    
+    final bool hasError = token == null ||
+        token.contains('Error') ||
+        token.contains('denegado') ||
+        token.contains('No disponible');
     return ListTile(
       leading: Icon(
         hasError ? Icons.warning_amber_rounded : icon,
@@ -187,60 +192,51 @@ class AppDrawer extends StatelessWidget {
       trailing: IconButton(
         icon: const Icon(Icons.copy, size: 20.0),
         tooltip: 'Copiar Token',
-        onPressed: hasError ? null : () {
-          Clipboard.setData(ClipboardData(text: token));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$title copiado')),
-          );
-        },
+        onPressed: hasError
+            ? null
+            : () {
+                Clipboard.setData(ClipboardData(text: token));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('$title copiado')),
+                );
+              },
       ),
     );
   }
- 
-// --- Reemplaza tu método con este ---
-Widget _buildDrawerHeader() {
-  // FutureBuilder se encarga de esperar el resultado de getCachedUserData()
-  return FutureBuilder<UserData?>(
-    future: UserCacheService.getCachedUserData(), // 1. El Future que debe esperar
-    builder: (context, snapshot) { // 2. La función que construye la UI
 
-      String userName = 'Invitado'; // Valor por defecto
-
-      // 3. Verificamos el estado del Future
-      if (snapshot.connectionState == ConnectionState.done) {
-        // Si el future terminó...
-        if (snapshot.hasData && snapshot.data != null) {
-          // ...y tenemos datos, usamos el nombre real.
-          userName = snapshot.data!.fullName; // Usamos el getter que ya tenías
-        } else if (snapshot.hasError) {
-          // ...y hubo un error, podríamos mostrar un mensaje.
-          userName = 'Error';
-          print('Error al cargar datos del usuario desde caché: ${snapshot.error}');
+  Widget _buildDrawerHeader() {
+    return FutureBuilder<UserData?>(
+      future: UserCacheService.getCachedUserData(),
+      builder: (context, snapshot) {
+        String userName = 'Invitado';
+        if (snapshot.connectionState == ConnectionState.done) {
+          if (snapshot.hasData && snapshot.data != null) {
+            userName = snapshot.data!.fullName;
+          } else if (snapshot.hasError) {
+            userName = 'Error';
+            print(
+                'Error al cargar datos del usuario desde caché: ${snapshot.error}');
+          }
         }
-      }
-      // Mientras el future está cargando (connectionState == waiting), se mostrará 'Invitado'.
-      // Podrías poner "Cargando..." si prefieres.
-
-      // 4. Construimos el widget final con el nombre obtenido
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Hola $userName!', // Usamos la variable con el nombre dinámico
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textDark,
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Hola $userName!',
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textDark,
+              ),
             ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
-Widget _buildDrawerItem({
+  Widget _buildDrawerItem({
     required BuildContext context,
     required IconData icon,
     required String title,
@@ -251,11 +247,11 @@ Widget _buildDrawerItem({
   }) {
     final String? currentRoute = ModalRoute.of(context)?.settings.name;
     final bool isSelected = currentRoute == routeName;
-
     return ListTile(
       selected: isSelected,
       selectedTileColor: AppColors.ColorFooter.withOpacity(0.1),
-      leading: Icon(icon, color: isSelected ? AppColors.ColorFooter : iconColor, size: 28),
+      leading: Icon(icon,
+          color: isSelected ? AppColors.ColorFooter : iconColor, size: 28),
       title: Text(
         title,
         style: TextStyle(
@@ -265,13 +261,9 @@ Widget _buildDrawerItem({
         ),
       ),
       trailing: trailing,
-      // --- PASO 2: Llama a onNavigate antes de navegar ---
       onTap: onTap ??
           () {
-            // Llama a la función que nos pasaron para pausar el timer
-            onNavigate?.call(); 
-            
-            // Luego, ejecuta la navegación normal
+            onNavigate?.call();
             Navigator.of(context).pop();
             if (routeName != null && !isSelected) {
               Navigator.of(context).pushNamed(routeName);

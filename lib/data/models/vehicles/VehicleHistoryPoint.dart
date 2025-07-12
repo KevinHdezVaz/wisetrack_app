@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-/// Modelo para la respuesta completa de la API del historial.
 class HistoryResponse {
   final List<HistoryPoint> data;
 
@@ -11,13 +10,13 @@ class HistoryResponse {
   factory HistoryResponse.fromJson(Map<String, dynamic> json) {
     final list = json['data'] as List<dynamic>? ?? [];
     return HistoryResponse(
-      data: list.map((item) => HistoryPoint.fromJson(item as Map<String, dynamic>)).toList(),
+      data: list
+          .map((item) => HistoryPoint.fromJson(item as Map<String, dynamic>))
+          .toList(),
     );
   }
 }
 
-/// Modelo para un único punto en el historial de un vehículo.
-/// Representa todos los campos relevantes del endpoint de historial.
 class HistoryPoint {
   final String plate;
   final DateTime? timestamp;
@@ -124,14 +123,12 @@ class HistoryPoint {
   });
 
   factory HistoryPoint.fromJson(Map<String, dynamic> json) {
-    // Helper para parsear números de forma segura (String -> double?)
     double? safeParseDouble(dynamic value) {
       if (value is num) return value.toDouble();
       if (value is String) return double.tryParse(value);
       return null;
     }
 
-    // Helper para parsear enteros de forma segura
     int? safeParseInt(dynamic value) {
       if (value is int) return value;
       if (value is String) return int.tryParse(value);

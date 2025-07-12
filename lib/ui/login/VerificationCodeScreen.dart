@@ -9,40 +9,33 @@ import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String email;
-  const OtpVerificationScreen({Key? key, required this.email}) : super(key: key);
+  const OtpVerificationScreen({Key? key, required this.email})
+      : super(key: key);
 
   @override
   _OtpVerificationScreenState createState() => _OtpVerificationScreenState();
 }
 
-// 1. Añadir el TickerProviderStateMixin
-class _OtpVerificationScreenState extends State<OtpVerificationScreen> with TickerProviderStateMixin {
+class _OtpVerificationScreenState extends State<OtpVerificationScreen>
+    with TickerProviderStateMixin {
   final _pinController = TextEditingController();
   bool _isNextButtonEnabled = false;
   bool _isResendButtonEnabled = false;
   bool _isLoading = false;
   Timer? _timer;
   int _countdown = 84;
-
-  // 2. Declarar el AnimationController
   late AnimationController _animationController;
 
-// EN: OtpVerificationScreen.dart
-
-@override
-void initState() {
-  super.initState();
-  _pinController.addListener(_updateButtonState);
-
-  // 3. Inicializar el AnimationController (si lo tienes aquí, mantenlo)
-  _animationController = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 3),
-  );
-
-  // Simplemente iniciamos el contador, ya que el código se solicitó en la pantalla anterior.
-  _startCountdown(); 
-}
+  @override
+  void initState() {
+    super.initState();
+    _pinController.addListener(_updateButtonState);
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    );
+    _startCountdown();
+  }
 
   @override
   void dispose() {
@@ -77,15 +70,14 @@ void initState() {
     });
   }
 
-  // --- 5. MODIFICACIÓN DE LOS MÉTODOS ASÍNCRONOS ---
-
   Future<void> _requestInitialCode() async {
     if (mounted) setState(() => _isLoading = true);
     _animationController.repeat(); // Inicia animación
 
     try {
       final response = await AuthService.requestPasswordReset(widget.email);
-      await _animationController.forward(from: _animationController.value); // Completa la animación
+      await _animationController.forward(
+          from: _animationController.value); // Completa la animación
       _animationController.stop();
 
       if (!mounted) return;
@@ -103,7 +95,8 @@ void initState() {
     } catch (e) {
       if (mounted) {
         _animationController.stop();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) {
@@ -121,7 +114,8 @@ void initState() {
 
     try {
       final response = await AuthService.requestPasswordReset(widget.email);
-      await _animationController.forward(from: _animationController.value); // Completa la animación
+      await _animationController.forward(
+          from: _animationController.value); // Completa la animación
       _animationController.stop();
 
       if (!mounted) return;
@@ -133,13 +127,15 @@ void initState() {
         _startCountdown();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message ?? 'Error al reenviar código')),
+          SnackBar(
+              content: Text(response.message ?? 'Error al reenviar código')),
         );
       }
     } catch (e) {
       if (mounted) {
         _animationController.stop();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) {
@@ -160,7 +156,8 @@ void initState() {
         email: widget.email,
         code: _pinController.text,
       );
-      await _animationController.forward(from: _animationController.value); // Completa la animación
+      await _animationController.forward(
+          from: _animationController.value); // Completa la animación
       _animationController.stop();
 
       if (!mounted) return;
@@ -172,7 +169,8 @@ void initState() {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ResetPasswordScreenUpdated(email: widget.email),
+            builder: (context) =>
+                ResetPasswordScreenUpdated(email: widget.email),
           ),
         );
       } else {
@@ -183,7 +181,8 @@ void initState() {
     } catch (e) {
       if (mounted) {
         _animationController.stop();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) {
@@ -239,11 +238,9 @@ void initState() {
             left: 16.0,
             child: _buildBackButton(context),
           ),
-          // --- 6. MODIFICACIÓN DEL INDICADOR DE CARGA ---
           if (_isLoading)
             Center(
               child: AnimatedTruckProgress(
-                // Se pasa el controlador completo
                 animation: _animationController,
               ),
             ),
@@ -251,9 +248,6 @@ void initState() {
       ),
     );
   }
-
-  // --- El resto de tus widgets (_buildBackButton, _buildBackground, etc.) no necesitan cambios ---
-  // --- Puedes copiarlos y pegarlos tal cual los tenías ---
 
   Widget _buildBackButton(BuildContext context) {
     return IconButton(
@@ -267,8 +261,7 @@ void initState() {
     );
   }
 
- Widget _buildBackground(BuildContext context) {
-    // Asegúrate de tener estas imágenes en tus assets
+  Widget _buildBackground(BuildContext context) {
     return Stack(
       children: [
         Positioned(

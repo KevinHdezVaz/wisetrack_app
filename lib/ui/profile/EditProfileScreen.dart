@@ -6,9 +6,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:wisetrack_app/data/models/User/UserDetail.dart';
 import 'package:wisetrack_app/data/services/UserService.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
- import 'package:path_provider/path_provider.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
@@ -18,12 +17,9 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  // Controladores para mostrar los datos
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _companyController;
-
-  // Estado de la pantalla
   File? _selectedImage;
   bool _isLoading = true;
   String? _errorMessage;
@@ -46,7 +42,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  /// Carga los datos iniciales del usuario desde el servidor.
   Future<void> _loadUserData() async {
     try {
       final userDetail = await UserService.getUserDetail();
@@ -68,99 +63,92 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     }
   }
- 
- Future<void> _showImagePickerOptions() async {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: Colors.transparent, // Importante para que funcionen los bordes
-    builder: (BuildContext context) {
-      return Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20.0),
-            topRight: Radius.circular(20.0),
+
+  Future<void> _showImagePickerOptions() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor:
+          Colors.transparent, // Importante para que funcionen los bordes
+      builder: (BuildContext context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20.0),
+              topRight: Radius.circular(20.0),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_library, color: Colors.black),
-                title: const Text('Elegir de la galería', 
-                    style: TextStyle(color: Colors.black)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.gallery);
-                },
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.photo_camera, color: Colors.black),
-                title: const Text('Tomar una foto', 
-                    style: TextStyle(color: Colors.black)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.camera);
-                },
-              ),
-              SizedBox(
-                height: MediaQuery.of(context).viewInsets.bottom,
-              ),
-            ],
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: Colors.black),
+                  title: const Text('Elegir de la galería',
+                      style: TextStyle(color: Colors.black)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.photo_camera, color: Colors.black),
+                  title: const Text('Tomar una foto',
+                      style: TextStyle(color: Colors.black)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                SizedBox(
+                  height: MediaQuery.of(context).viewInsets.bottom,
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
-
-Future<void> _pickImage(ImageSource source) async {
-  final ImagePicker picker = ImagePicker();
-  final XFile? pickedFile = await picker.pickImage(source: source);
-
-  if (pickedFile == null) return; // Si el usuario no elige nada, salimos.
-
-  // --- INICIO DE LA COMPRESIÓN ---
-  final originalFile = File(pickedFile.path);
-
-  // Define una ruta temporal para guardar el archivo comprimido
-  final tempDir = await getTemporaryDirectory();
-  final targetPath = p.join(tempDir.path, "temp_profile.jpg");
-
-  // Comprime el archivo y lo guarda en la nueva ruta
-  final XFile? compressedFile = await FlutterImageCompress.compressAndGetFile(
-    originalFile.absolute.path,
-    targetPath,
-    quality: 60, // Calidad de 0 a 100. Un valor entre 50-70 es ideal.
-  );
-
-  if (compressedFile != null && mounted) {
-    setState(() {
-      // Usamos la imagen COMPRIMIDA para la vista previa y para la subida
-      _selectedImage = File(compressedFile.path);
-    });
-    // Logs para verificar la compresión
-    print('Tamaño original: ${(originalFile.lengthSync() / 1024 / 1024).toStringAsFixed(2)} MB');
-    print('Tamaño comprimido: ${(_selectedImage!.lengthSync() / 1024).toStringAsFixed(2)} KB');
+        );
+      },
+    );
   }
-  // --- FIN DE LA COMPRESIÓN ---
-}
 
-Future<bool> _checkPermissions(ImageSource source) async {
-  if (Platform.isIOS) {
-    final status = await Permission.photos.status;
-    if (source == ImageSource.camera) {
-      return await Permission.camera.request().isGranted;
-    } else {
-      return await Permission.photos.request().isGranted;
+  Future<void> _pickImage(ImageSource source) async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? pickedFile = await picker.pickImage(source: source);
+
+    if (pickedFile == null) return; // Si el usuario no elige nada, salimos.
+    final originalFile = File(pickedFile.path);
+    final tempDir = await getTemporaryDirectory();
+    final targetPath = p.join(tempDir.path, "temp_profile.jpg");
+    final XFile? compressedFile = await FlutterImageCompress.compressAndGetFile(
+      originalFile.absolute.path,
+      targetPath,
+      quality: 60, // Calidad de 0 a 100. Un valor entre 50-70 es ideal.
+    );
+
+    if (compressedFile != null && mounted) {
+      setState(() {
+        _selectedImage = File(compressedFile.path);
+      });
+      print(
+          'Tamaño original: ${(originalFile.lengthSync() / 1024 / 1024).toStringAsFixed(2)} MB');
+      print(
+          'Tamaño comprimido: ${(_selectedImage!.lengthSync() / 1024).toStringAsFixed(2)} KB');
     }
   }
-  return true; // En Android no es necesario en la mayoría de casos
-}
 
-  /// Guarda los cambios enviando los datos al servidor.
+  Future<bool> _checkPermissions(ImageSource source) async {
+    if (Platform.isIOS) {
+      final status = await Permission.photos.status;
+      if (source == ImageSource.camera) {
+        return await Permission.camera.request().isGranted;
+      } else {
+        return await Permission.photos.request().isGranted;
+      }
+    }
+    return true; // En Android no es necesario en la mayoría de casos
+  }
+
   Future<void> _saveChanges() async {
     if (_selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -219,7 +207,8 @@ Future<bool> _checkPermissions(ImageSource source) async {
       body: Stack(
         children: [
           if (_isLoading)
-            const Center(child: CircularProgressIndicator(color: AppColors.primary))
+            const Center(
+                child: CircularProgressIndicator(color: AppColors.primary))
           else if (_errorMessage != null)
             Center(child: Text(_errorMessage!))
           else
@@ -238,15 +227,15 @@ Future<bool> _checkPermissions(ImageSource source) async {
                 const SizedBox(height: 30),
                 _buildTextField(label: 'Nombre', controller: _nameController),
                 const SizedBox(height: 20),
-                _buildTextField(label: 'Correo electrónico', controller: _emailController),
+                _buildTextField(
+                    label: 'Correo electrónico', controller: _emailController),
                 const SizedBox(height: 20),
-                _buildTextField(label: 'Empresa', controller: _companyController),
+                _buildTextField(
+                    label: 'Empresa', controller: _companyController),
                 const SizedBox(height: 120),
               ],
             ),
-          // El botón solo aparece si no está cargando y no hay errores
-          if (!_isLoading && _errorMessage == null)
-            _buildSaveChangesButton(),
+          if (!_isLoading && _errorMessage == null) _buildSaveChangesButton(),
         ],
       ),
     );
@@ -284,14 +273,12 @@ Future<bool> _checkPermissions(ImageSource source) async {
   }
 
   Widget _buildProfileImage() {
-    // Si hay una imagen seleccionada, muéstrala desde el archivo local.
     if (_selectedImage != null) {
       return CircleAvatar(
         radius: 50,
         backgroundImage: FileImage(_selectedImage!),
       );
     }
-    // Si no, muestra la imagen de la red o un ícono por defecto.
     return CircleAvatar(
       radius: 50,
       backgroundColor: const Color(0xFFE6E0F8),
@@ -304,7 +291,8 @@ Future<bool> _checkPermissions(ImageSource source) async {
     );
   }
 
-  Widget _buildTextField({required String label, required TextEditingController controller}) {
+  Widget _buildTextField(
+      {required String label, required TextEditingController controller}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -318,8 +306,10 @@ Future<bool> _checkPermissions(ImageSource source) async {
           readOnly: true, // Hace que el campo no se pueda editar
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors.grey.shade100, // Color para indicar que es de solo lectura
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            fillColor: Colors
+                .grey.shade100, // Color para indicar que es de solo lectura
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide.none,
@@ -330,38 +320,34 @@ Future<bool> _checkPermissions(ImageSource source) async {
     );
   }
 
-  
-Widget _buildSaveChangesButton() {
-  return Align(
-    alignment: Alignment.bottomCenter,
-    child: Container(
-      padding: const EdgeInsets.fromLTRB(40, 0, 40, 50),
-      color: Colors.white,
-      width: double.infinity,
-      child: ElevatedButton(
-        // --- CAMBIO AQUÍ ---
-        // El botón solo estará habilitado si `_selectedImage` NO es nulo y
-        // la pantalla NO está cargando.
-        onPressed: (_selectedImage != null && !_isLoading) ? _saveChanges : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          // El color para cuando está deshabilitado se aplicará automáticamente
-          disabledBackgroundColor: Colors.grey.shade300,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10.0),
+  Widget _buildSaveChangesButton() {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(40, 0, 40, 50),
+        color: Colors.white,
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed:
+              (_selectedImage != null && !_isLoading) ? _saveChanges : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            disabledBackgroundColor: Colors.grey.shade300,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10.0),
+            ),
           ),
-        ),
-        child: const Text(
-          'Guardar cambios',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+          child: const Text(
+            'Guardar cambios',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

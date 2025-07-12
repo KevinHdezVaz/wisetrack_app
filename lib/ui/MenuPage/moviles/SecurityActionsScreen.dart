@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
-// Asegúrate de que las rutas a tus archivos personalizados sean correctas
 import 'custom_dialogs.dart';
 
 class SecurityActionsScreen extends StatelessWidget {
-  // Se añade la patente del vehículo como un campo requerido.
   final String plate;
 
   const SecurityActionsScreen({
     Key? key,
     required this.plate, // El constructor ahora requiere la patente.
   }) : super(key: key);
-
-  /// Simula una llamada a un servidor para realizar una acción.
   Future<bool> _simulateApiCall() async {
     await Future.delayed(const Duration(seconds: 2));
     return (DateTime.now().second % 10) < 7;
@@ -26,7 +22,6 @@ class SecurityActionsScreen extends StatelessWidget {
         scrolledUnderElevation: 0,
         backgroundColor: Colors.white,
         leading: _buildBackButton(context),
-        // El título ahora muestra la pantalla y la patente del vehículo.
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -100,9 +95,7 @@ class SecurityActionsScreen extends StatelessWidget {
           _buildActionButton(
             icon: Icons.password,
             label: 'Código de corte',
-            onTap: () {
-              // TODO: Lógica para la pantalla o modal de "Código de corte"
-            },
+            onTap: () {},
           ),
           const SizedBox(height: 30),
           _buildSectionTitle('Chapa randómica'),
@@ -110,25 +103,19 @@ class SecurityActionsScreen extends StatelessWidget {
           _buildActionButton(
             icon: Icons.lock_open_outlined,
             label: 'Destrabar chapa randómica',
-            onTap: () {
-              // TODO: Lógica para destrabar chapa
-            },
+            onTap: () {},
           ),
           const SizedBox(height: 12),
           _buildActionButton(
             icon: Icons.lock_outline,
             label: 'Trabar chapa randómica',
-            onTap: () {
-              // TODO: Lógica para trabar chapa
-            },
+            onTap: () {},
           ),
           const SizedBox(height: 12),
           _buildActionButton(
             icon: Icons.password,
             label: 'Código de chapa randómica',
-            onTap: () {
-              // TODO: Lógica para el código de chapa
-            },
+            onTap: () {},
           ),
         ],
       ),

@@ -10,7 +10,8 @@ class NotificationPermissions {
   factory NotificationPermissions.fromJson(Map<String, dynamic> json) {
     return NotificationPermissions(
       allowNotification: json['allow_notification'] ?? false,
-      alertPermissions: AlertPermissions.fromJson(json['alert_permissions'] ?? {}),
+      alertPermissions:
+          AlertPermissions.fromJson(json['alert_permissions'] ?? {}),
     );
   }
 
@@ -21,7 +22,6 @@ class NotificationPermissions {
     };
   }
 
-  // Método para crear una copia con algunos valores modificados
   NotificationPermissions copyWith({
     bool? allowNotification,
     AlertPermissions? alertPermissions,
@@ -78,16 +78,19 @@ class AlertPermissions {
     return AlertPermissions(
       shortBreak: shortBreak ?? this.shortBreak,
       maxSpeed: maxSpeed ?? this.maxSpeed,
-      noArrivalAtDestination: noArrivalAtDestination ?? this.noArrivalAtDestination,
+      noArrivalAtDestination:
+          noArrivalAtDestination ?? this.noArrivalAtDestination,
       tenHoursDriving: tenHoursDriving ?? this.tenHoursDriving,
       continuousDriving: continuousDriving ?? this.continuousDriving,
     );
   }
 
-  // Método útil para UI
-  bool get anyAlertEnabled => 
-      shortBreak || maxSpeed || noArrivalAtDestination || 
-      tenHoursDriving || continuousDriving;
+  bool get anyAlertEnabled =>
+      shortBreak ||
+      maxSpeed ||
+      noArrivalAtDestination ||
+      tenHoursDriving ||
+      continuousDriving;
 }
 
 class NotificationPermissionsResponse {

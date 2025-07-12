@@ -20,7 +20,6 @@ class _DataVisualizationScreenState extends State<DataVisualizationScreen> {
   @override
   void initState() {
     super.initState();
-    // Llama al servicio para obtener los datos consolidados.
     _dashboardDataFuture = DashboardService.getDashboardData(rangeInHours: 24);
   }
 
@@ -48,7 +47,6 @@ class _DataVisualizationScreenState extends State<DataVisualizationScreen> {
     );
   }
 
-  /// Construye la lista de gráficos una vez que los datos de la API han llegado.
   Widget _buildCharts(DashboardData data) {
     final List<BarChartDataModel> mobilesData =
         _mapToChartData(data.vehicleTypes, AppColors.primary);
@@ -91,8 +89,7 @@ class _DataVisualizationScreenState extends State<DataVisualizationScreen> {
           maxValue: maxStatusValue,
           dataType: 'd_vehicles_status', // Se pasa el dataType correcto
         ),
-                const SizedBox(height: 30),
-
+        const SizedBox(height: 30),
       ],
     );
   }
@@ -158,17 +155,16 @@ class ChartCard extends StatelessWidget {
       },
       child: Card(
         elevation: 10,
-                    color: Colors.white, // Fondo blanco explícito
+        color: Colors.white, // Fondo blanco explícito
 
         shadowColor: Colors.black,
-     shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15.0),
-        // Añadimos el borde "medio negro" (un gris claro)
-        side: BorderSide(
-          color: Colors.grey.shade300,
-          width: 1.0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15.0),
+          side: BorderSide(
+            color: Colors.grey.shade300,
+            width: 1.0,
+          ),
         ),
-      ), 
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -247,7 +243,8 @@ class ChartCard extends StatelessWidget {
                         : 0;
                     return Container(
                       height: 20,
-                      width: barWidth.clamp(0.0, constraints.maxWidth).toDouble(),
+                      width:
+                          barWidth.clamp(0.0, constraints.maxWidth).toDouble(),
                       decoration: BoxDecoration(
                         color: item.color,
                         borderRadius: BorderRadius.circular(4),
@@ -270,7 +267,7 @@ class ChartCard extends StatelessWidget {
         builder: (context, constraints) {
           int numberOfLabels = 5;
           if (constraints.maxWidth < 150) numberOfLabels = 3;
-          
+
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(numberOfLabels, (index) {
@@ -297,15 +294,15 @@ class ChartCard extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.bold)),
           InkWell(
             onTap: () {
-                 Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DataVisualizationDetail(
-              title: title,
-              dataType: dataType,
-            ),
-          ),
-        );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DataVisualizationDetail(
+                    title: title,
+                    dataType: dataType,
+                  ),
+                ),
+              );
             },
             child: Row(
               children: [

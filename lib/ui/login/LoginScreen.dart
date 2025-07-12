@@ -15,7 +15,8 @@ class LoginScreen extends StatefulWidget {
   _LoginScreenState createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   bool _isPasswordVisible = false;
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -30,12 +31,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     _usernameController.addListener(_updateButtonState);
     _passwordController.addListener(_updateButtonState);
     _companyController.addListener(_updateButtonState);
-    
-    // El controlador ya estaba, solo ajustamos la duración si es necesario
     _animationController = AnimationController(
         vsync: this,
-        duration: const Duration(seconds: 4) // Duración de un ciclo de animación
-    );
+        duration:
+            const Duration(seconds: 4) // Duración de un ciclo de animación
+        );
   }
 
   @override
@@ -55,93 +55,87 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     });
   }
 
-  // --- LÓGICA DE LOGIN REFINADA ---
-Future<void> _login() async {
-  if (!_isButtonEnabled || _isLoading) return;
+  Future<void> _login() async {
+    if (!_isButtonEnabled || _isLoading) return;
 
-  setState(() {
-    _isLoading = true;
-  });
+    setState(() {
+      _isLoading = true;
+    });
+    _animationController.repeat();
 
-  // Inicia la animación en bucle
-  _animationController.repeat();
+    try {
+      final base64Password =
+          EncryptionUtils.toBase64(_passwordController.text.trim());
 
-  try {
+      final loginResponse = await AuthService.login(
+        username: _usernameController.text.trim(),
+        password: base64Password,
+        company: _companyController.text.trim(),
+      );
+      _animationController
+          .forward(from: _animationController.value)
+          .whenCompleteOrCancel(() {
+        _animationController.stop();
 
-        final base64Password = EncryptionUtils.toBase64(_passwordController.text.trim());
+        if (!mounted) return;
 
-
-    final loginResponse = await AuthService.login(
-      username: _usernameController.text.trim(),
-      password: base64Password,  
-      company: _companyController.text.trim(),
-    );
-
-    // Detiene el bucle y completa la animación suavemente
-    _animationController.forward(from: _animationController.value).whenCompleteOrCancel(() {
-      _animationController.stop();
-
-      if (!mounted) return;
-
-      if (loginResponse.token.isNotEmpty) {
-       
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => DashboardScreen()),
-        );
-      } else {
-   
-        String errorMessage = 'Usuario, contraseña o empresa incorrectos';
-        if (loginResponse.error != null) {
-          try {
-            // Decodifica el JSON del error
-            final errorData = jsonDecode(loginResponse.error!);
-            if (errorData is Map && errorData.containsKey('error')) {
-              final innerError = jsonDecode(errorData['error']);
-              if (innerError is Map && innerError.containsKey('non_field_errors')) {
-                final errors = innerError['non_field_errors'];
-                if (errors is List && errors.isNotEmpty) {
-                  errorMessage = errors[0]['string'] ?? errorMessage;
-                  // Corrige problemas de codificación (si el servidor no usa UTF-8)
-                  errorMessage = errorMessage.replaceAll('invÃ¡lidas', 'inválidas');
+        if (loginResponse.token.isNotEmpty) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => DashboardScreen()),
+          );
+        } else {
+          String errorMessage = 'Usuario, contraseña o empresa incorrectos';
+          if (loginResponse.error != null) {
+            try {
+              final errorData = jsonDecode(loginResponse.error!);
+              if (errorData is Map && errorData.containsKey('error')) {
+                final innerError = jsonDecode(errorData['error']);
+                if (innerError is Map &&
+                    innerError.containsKey('non_field_errors')) {
+                  final errors = innerError['non_field_errors'];
+                  if (errors is List && errors.isNotEmpty) {
+                    errorMessage = errors[0]['string'] ?? errorMessage;
+                    errorMessage =
+                        errorMessage.replaceAll('invÃ¡lidas', 'inválidas');
+                  }
                 }
               }
+            } catch (e) {
+              errorMessage =
+                  'Error al iniciar sesión, Intentalo de nuevo mas tarde.';
             }
-          } catch (e) {
-            // Si el parseo falla, usa el mensaje por defecto
-            errorMessage = 'Error al iniciar sesión, Intentalo de nuevo mas tarde.';
           }
-        }
 
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        _animationController.stop();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            duration: const Duration(seconds: 3),
+          const SnackBar(
+            content:
+                Text('Error de conexión: No se pudo conectar con el servidor'),
+            duration: Duration(seconds: 3),
           ),
         );
       }
-    });
-  } catch (e) {
-    if (mounted) {
-      _animationController.stop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error de conexión: No se pudo conectar con el servidor'),
-          duration: Duration(seconds: 3),
-        ),
-      );
-    }
-  } finally {
-    // Pequeña demora para que la animación termine de forma visible
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-      _animationController.reset();
+    } finally {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _animationController.reset();
+      }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -169,11 +163,9 @@ Future<void> _login() async {
               ),
             ),
           ),
-          // --- INDICADOR DE CARGA CENTRALIZADO ---
           if (_isLoading)
             Center(
               child: AnimatedTruckProgress(
-                // Pasamos el controlador completo
                 animation: _animationController,
               ),
             ),
@@ -182,10 +174,7 @@ Future<void> _login() async {
     );
   }
 
-  // --- El resto de tus widgets (_buildBackground, etc.) están bien ---
-  // --- Puedes copiarlos y pegarlos tal cual los tenías ---
   Widget _buildBackground(BuildContext context) {
-    // Asegúrate que las imágenes existen en tu pubspec.yaml y la ruta es correcta
     return Stack(
       children: [
         Positioned(
@@ -257,11 +246,11 @@ Future<void> _login() async {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            // El onPressed ahora llama a la función _login refactorizada
             onPressed: _isButtonEnabled && !_isLoading ? _login : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  _isButtonEnabled && !_isLoading ? AppColors.primary : Colors.grey.shade400,
+              backgroundColor: _isButtonEnabled && !_isLoading
+                  ? AppColors.primary
+                  : Colors.grey.shade400,
               disabledBackgroundColor: Colors.grey.shade400,
               padding: const EdgeInsets.symmetric(vertical: 10),
               minimumSize: const Size(0, 50),
@@ -294,16 +283,12 @@ Future<void> _login() async {
                 style: TextStyle(color: Colors.black)),
             GestureDetector(
               onTap: () {
-                // Aquí deberías navegar a tu pantalla de registro
-                // Navigator.push(context, MaterialPageRoute(builder: (context) => SignUpScreen()));
                 print("Navegar a pantalla de registro");
               },
               child: const Text(
                 'Créala aquí.',
                 style: TextStyle(
-                  color: Color(0xFF008C95),
-                  fontWeight: FontWeight.bold
-                ),
+                    color: Color(0xFF008C95), fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -319,9 +304,7 @@ Future<void> _login() async {
           child: const Text(
             'Recupera tu cuenta.',
             style: TextStyle(
-              color: Color(0xFF008C95),
-              fontWeight: FontWeight.bold
-            ),
+                color: Color(0xFF008C95), fontWeight: FontWeight.bold),
           ),
         ),
       ],
@@ -355,7 +338,7 @@ Future<void> _login() async {
               borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
-              focusedBorder: OutlineInputBorder(
+            focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.0),
               borderSide:
                   const BorderSide(color: AppColors.primary, width: 1.5),
@@ -390,7 +373,7 @@ Future<void> _login() async {
               borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
-              focusedBorder: OutlineInputBorder(
+            focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.0),
               borderSide:
                   const BorderSide(color: AppColors.primary, width: 1.5),

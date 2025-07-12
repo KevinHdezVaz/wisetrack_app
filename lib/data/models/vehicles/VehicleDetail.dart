@@ -1,5 +1,3 @@
-// lib/data/models/vehicles/VehicleDetail.dart
-
 import 'package:flutter/material.dart';
 
 class VehicleDetail {
@@ -27,8 +25,6 @@ class VehicleDetail {
 
   factory VehicleDetail.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? {};
-
-    // Helper para parsear números de forma segura
     double? safeParseDouble(dynamic value) {
       if (value is num) {
         return value.toDouble();
@@ -39,7 +35,6 @@ class VehicleDetail {
       return null;
     }
 
-    // Helper para parsear fechas de forma segura
     DateTime? safeParseDateTime(dynamic value) {
       if (value is String) {
         return DateTime.tryParse(value);
@@ -47,13 +42,11 @@ class VehicleDetail {
       return null;
     }
 
-    // Helper para parsear accesorios de forma segura
     Map<String, String>? safeParseAccessories(dynamic value) {
       if (value is Map<String, dynamic>) {
         try {
-          // Convertimos el mapa dinámico a Map<String, String>
-          return value.map((key, value) => 
-            MapEntry(key, value?.toString() ?? 'Sin dato'));
+          return value.map(
+              (key, value) => MapEntry(key, value?.toString() ?? 'Sin dato'));
         } catch (e) {
           debugPrint('Error parsing accessories: $e');
           return null;
@@ -71,7 +64,7 @@ class VehicleDetail {
       location: data['location'] as String? ?? 'Sin ubicación',
       batteryVolt: safeParseDouble(data['battery_volt']),
       fuelCutoff: data['fuel_cutoff'] as String? ?? 'Sin datos',
-      accessories: json['accessories'] != null 
+      accessories: json['accessories'] != null
           ? safeParseAccessories(json['accessories']['data'])
           : null,
     );

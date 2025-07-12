@@ -1,4 +1,3 @@
-// archivo: success_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 
@@ -55,9 +54,7 @@ class SuccessDialog extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                // Primero cierra el diálogo
                 Navigator.of(context).pop();
-                // Luego cierra la pantalla de edición para volver a la anterior
                 Navigator.of(context).pop();
               },
               style: ElevatedButton.styleFrom(

@@ -4,7 +4,6 @@ import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 
 class FilterBottomSheet extends StatefulWidget {
-  // Recibe los filtros iniciales para poder precargarlos
   final Set<String> initialFilters;
 
   const FilterBottomSheet({Key? key, required this.initialFilters})
@@ -15,24 +14,18 @@ class FilterBottomSheet extends StatefulWidget {
 }
 
 class _FilterBottomSheetState extends State<FilterBottomSheet> {
-  // Filtros seleccionados por el usuario
   late Set<String> _selectedFilters;
-
-  // --- INICIO: Estado para manejar la carga de datos ---
   bool _isLoading = true;
   String? _errorMessage;
   List<VehicleType> _vehicleTypes = [];
-  // --- FIN: Estado para manejar la carga de datos ---
 
   @override
   void initState() {
     super.initState();
     _selectedFilters = Set.from(widget.initialFilters);
-    // Llama al método para obtener los datos cuando el widget se inicializa
     _fetchVehicleTypes();
   }
 
-  /// Obtiene los tipos de vehículo desde el servicio y actualiza el estado.
   Future<void> _fetchVehicleTypes() async {
     try {
       final types = await VehicleService.getVehicleTypes();
@@ -91,13 +84,10 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                 ],
               ),
               const SizedBox(height: 12.0),
-              // --- INICIO: Construcción dinámica de la sección de filtros ---
               _buildVehicleTypeSection(),
-              // --- FIN: Construcción dinámica ---
               _buildFilterSection('Posición', ['Válida', 'Inválida']),
               _buildFilterSection('Conexión', ['Online', 'Offline']),
               _buildFilterSection('Estado de motor', ['Encendido', 'Apagado']),
-         
               const SizedBox(height: 16.0),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -140,18 +130,19 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     );
   }
 
-  /// Widget que decide si mostrar un indicador de carga, un error o la lista de filtros.
   Widget _buildVehicleTypeSection() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary,));
+      return const Center(
+          child: CircularProgressIndicator(
+        color: AppColors.primary,
+      ));
     }
 
     if (_errorMessage != null) {
       return Center(
-          child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)));
+          child:
+              Text(_errorMessage!, style: const TextStyle(color: Colors.red)));
     }
-
-    // Si todo va bien, crea la lista de nombres a partir de los datos obtenidos.
     final typeNames = _vehicleTypes.map((type) => type.name).toList();
 
     return _buildFilterSection('Tipo de vehículo', typeNames);

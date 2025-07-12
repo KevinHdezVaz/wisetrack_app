@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
- import 'package:wisetrack_app/data/models/dashboard/BalanceResponse.dart';
+import 'package:wisetrack_app/data/models/dashboard/BalanceResponse.dart';
 import 'package:wisetrack_app/data/services/DashboardService.dart';
- import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class BalanceScreen extends StatefulWidget {
   const BalanceScreen({Key? key}) : super(key: key);
@@ -10,7 +10,8 @@ class BalanceScreen extends StatefulWidget {
   _BalanceScreenState createState() => _BalanceScreenState();
 }
 
-class _BalanceScreenState extends State<BalanceScreen> with SingleTickerProviderStateMixin {
+class _BalanceScreenState extends State<BalanceScreen>
+    with SingleTickerProviderStateMixin {
   late Future<BalanceResponse> _balanceFuture;
   late AnimationController _animationController;
 
@@ -49,7 +50,8 @@ class _BalanceScreenState extends State<BalanceScreen> with SingleTickerProvider
           _animationController.stop();
 
           if (snapshot.hasError) {
-            return Center(child: Text('Error al cargar datos: ${snapshot.error}'));
+            return Center(
+                child: Text('Error al cargar datos: ${snapshot.error}'));
           }
           if (snapshot.hasData) {
             final balanceData = snapshot.data!;
@@ -65,21 +67,24 @@ class _BalanceScreenState extends State<BalanceScreen> with SingleTickerProvider
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: balanceData.data.map((balanceItem) {
-        // Convertimos los valores a double para el progress indicator
         final values = balanceItem.details
             .where((detail) => double.tryParse(detail.value) != null)
             .map((detail) => double.parse(detail.value))
             .toList();
 
-        final maxValue = values.isNotEmpty ? values.reduce((a, b) => a > b ? a : b) : 1.0;
-        final progressValue = maxValue > 0 ? (values.isNotEmpty ? values[0] / maxValue : 0.0) : 0.0;
+        final maxValue =
+            values.isNotEmpty ? values.reduce((a, b) => a > b ? a : b) : 1.0;
+        final progressValue = maxValue > 0
+            ? (values.isNotEmpty ? values[0] / maxValue : 0.0)
+            : 0.0;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 16.0),
           child: MetricCard(
             title: balanceItem.balanceTitle,
             progressValue: progressValue,
-            progressText: values.isNotEmpty ? values[0].toStringAsFixed(2) : '0.00',
+            progressText:
+                values.isNotEmpty ? values[0].toStringAsFixed(2) : '0.00',
             progressColor: _getColorForBalanceItem(balanceItem.id),
             legendItems: balanceItem.details.map((detail) {
               return LegendItem(
@@ -124,7 +129,6 @@ class _BalanceScreenState extends State<BalanceScreen> with SingleTickerProvider
   }
 }
 
-// --- WIDGETS REUTILIZABLES ---
 class MetricCard extends StatelessWidget {
   final String title;
   final double progressValue;
@@ -160,8 +164,8 @@ class MetricCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 16)),
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -204,10 +208,9 @@ class MetricCard extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-              child: Text(item.text,
-                  style: TextStyle(color: Colors.grey[700]))),
-          Text(item.value,
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+              child:
+                  Text(item.text, style: TextStyle(color: Colors.grey[700]))),
+          Text(item.value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -241,10 +244,9 @@ class CircularMetricIndicator extends StatelessWidget {
             valueColor: AlwaysStoppedAnimation<Color>(color),
           ),
           Center(
-            child: Text(
-              text,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 22)),
+            child: Text(text,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
           ),
         ],
       ),

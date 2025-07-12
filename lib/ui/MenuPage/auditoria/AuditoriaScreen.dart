@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
- import 'package:wisetrack_app/data/services/vehicles_service.dart';
+import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/FilterBottomSheet.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/SecurityActionsScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/VehicleDetailScreen.dart';
@@ -36,13 +36,14 @@ class _AuditoriaScreenState extends State<AuditoriaScreen>
     _fetchInitialData();
   }
 
-@override
-void dispose() {
-  _animationController.stop();  // Detener la animación primero
-  _animationController.dispose(); // Luego disponer el controlador
-  _searchController.dispose();
-  super.dispose();
-}
+  @override
+  void dispose() {
+    _animationController.stop();
+    _animationController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchInitialData() async {
     setState(() {
       _isLoading = true;
@@ -60,7 +61,9 @@ void dispose() {
       final List<Vehicle> vehicles = results[0] as List<Vehicle>;
       final List<VehicleType> types = results[1] as List<VehicleType>;
 
-      final Map<int, String> typesMap = {for (var type in types) type.id: type.name};
+      final Map<int, String> typesMap = {
+        for (var type in types) type.id: type.name
+      };
 
       await _animationController.forward(from: _animationController.value);
       _animationController.stop();
@@ -95,7 +98,8 @@ void dispose() {
     final query = _searchController.text.toLowerCase();
 
     _displayedVehicles = _allVehicles.where((vehicle) {
-      final vehicleTypeName = _vehicleTypeMap[vehicle.vehicleType]?.toLowerCase() ?? '';
+      final vehicleTypeName =
+          _vehicleTypeMap[vehicle.vehicleType]?.toLowerCase() ?? '';
 
       final matchesSearchQuery = vehicle.plate.toLowerCase().contains(query) ||
           vehicleTypeName.contains(query);
@@ -104,30 +108,39 @@ void dispose() {
         return matchesSearchQuery;
       }
 
-      bool typeMatches = !_currentFilters
-              .any((f) => _vehicleTypeMap.values.any((v) => v.toLowerCase() == f.toLowerCase())) ||
+      bool typeMatches = !_currentFilters.any((f) => _vehicleTypeMap.values
+              .any((v) => v.toLowerCase() == f.toLowerCase())) ||
           _currentFilters.contains(_vehicleTypeMap[vehicle.vehicleType]);
 
-      bool positionMatches = !_currentFilters.any((f) => ['Válida', 'Inválida'].contains(f)) ||
+      bool positionMatches = !_currentFilters
+              .any((f) => ['Válida', 'Inválida'].contains(f)) ||
           (_currentFilters.contains('Válida') && vehicle.statusVehicle == 1) ||
           (_currentFilters.contains('Inválida') && vehicle.statusVehicle == 0);
 
-      bool connectionMatches = !_currentFilters.any((f) => ['Online', 'Offline'].contains(f)) ||
+      bool connectionMatches = !_currentFilters
+              .any((f) => ['Online', 'Offline'].contains(f)) ||
           (_currentFilters.contains('Online') && vehicle.statusDevice == 1) ||
           (_currentFilters.contains('Offline') && vehicle.statusDevice == 0);
 
-      bool engineStatusMatches = !_currentFilters.any((f) => ['Encendido', 'Apagado'].contains(f)) ||
-          (_currentFilters.contains('Encendido') && vehicle.statusVehicle == 1) ||
+      bool engineStatusMatches = !_currentFilters
+              .any((f) => ['Encendido', 'Apagado'].contains(f)) ||
+          (_currentFilters.contains('Encendido') &&
+              vehicle.statusVehicle == 1) ||
           (_currentFilters.contains('Apagado') && vehicle.statusVehicle == 0);
 
-      return matchesSearchQuery && typeMatches && positionMatches && connectionMatches && engineStatusMatches;
+      return matchesSearchQuery &&
+          typeMatches &&
+          positionMatches &&
+          connectionMatches &&
+          engineStatusMatches;
     }).toList();
 
     setState(() {});
   }
 
   String _getIconForVehicleType(String typeName) {
-    final normalizedTypeName = typeName.toLowerCase().replaceAll(' ', '_').replaceAll('/', '_');
+    final normalizedTypeName =
+        typeName.toLowerCase().replaceAll(' ', '_').replaceAll('/', '_');
     switch (normalizedTypeName) {
       case 'tracto':
         return 'assets/images/icons/tracto.png';
@@ -219,7 +232,8 @@ void dispose() {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _refreshVehicles,
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
               child: const Text(
                 'Reintentar',
                 style: TextStyle(color: Colors.white),
@@ -282,10 +296,9 @@ void dispose() {
             children: [
               GestureDetector(
                 onTap: () {
-                  
-                                  _animationController.stop(); // Detener animación antes de navegar
-Navigator.of(context).pop();
-  },
+                  _animationController.stop();
+                  Navigator.of(context).pop();
+                },
                 child: Image.asset(
                   'assets/images/backbtn.png',
                   width: 40,
@@ -368,7 +381,8 @@ Navigator.of(context).pop();
   }
 
   Widget _buildVehicleTile(Vehicle vehicle, BuildContext context) {
-    final String vehicleTypeName = _vehicleTypeMap[vehicle.vehicleType] ?? 'Desconocido';
+    final String vehicleTypeName =
+        _vehicleTypeMap[vehicle.vehicleType] ?? 'Desconocido';
     final String vehicleIconPath = _getIconForVehicleType(vehicleTypeName);
     Color iconBgColor = vehicle.statusDevice == 1
         ? AppColors.primary.withOpacity(0.8)
@@ -376,19 +390,20 @@ Navigator.of(context).pop();
 
     bool isLocationActive = vehicle.statusVehicle == 1;
     bool isGpsActive = vehicle.statusDevice == 1;
-    bool isKeyActive = false; // Replace with actual logic if available
-    bool isShieldActive = false; // Replace with actual logic if available
+    bool isKeyActive = false;
+    bool isShieldActive = false;
 
     return InkWell(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
- builder: (context) => VehicleDetailScreen(
-            plate: vehicle.plate,
-            originScreen: 'audit', // Bandera de origen diferente
-            onDataChanged: _refreshVehicles,
-          ),          ),
+            builder: (context) => VehicleDetailScreen(
+              plate: vehicle.plate,
+              originScreen: 'audit',
+              onDataChanged: _refreshVehicles,
+            ),
+          ),
         );
       },
       child: Padding(
@@ -416,7 +431,8 @@ Navigator.of(context).pop();
                 children: [
                   Text(
                     vehicle.plate,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ],
               ),
@@ -427,22 +443,19 @@ Navigator.of(context).pop();
                 _statusIcon('ubi', isLocationActive),
                 _statusIcon('gps', isGpsActive),
                 _statusIcon('llave', isKeyActive),
-          GestureDetector(
-                    onTap: () {
-                      // Oculta el teclado y la lista para una transición limpia.
-                     // _searchFocusNode.unfocus();
-                      // Navega a la pantalla de seguridad, pasando la patente.
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SecurityActionsScreen(
-                            plate: vehicle.plate,
-                          ),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SecurityActionsScreen(
+                          plate: vehicle.plate,
                         ),
-                      );
-                    },
-                    child: _statusIconShield('shield', isShieldActive),
-                  ),
+                      ),
+                    );
+                  },
+                  child: _statusIconShield('shield', isShieldActive),
+                ),
               ],
             ),
           ],
@@ -451,7 +464,7 @@ Navigator.of(context).pop();
     );
   }
 
- Widget _statusIconShield(String baseName, bool isActive) {
+  Widget _statusIconShield(String baseName, bool isActive) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10.0),
       child: Image.asset(

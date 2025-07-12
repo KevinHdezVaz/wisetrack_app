@@ -57,13 +57,11 @@ class OnboardingscreenTwo extends StatelessWidget {
         child: Column(
           children: [
             const Spacer(flex: 2),
-            // Ilustración principal
             Image.asset(
               'assets/images/introPage2.png',
               height: MediaQuery.of(context).size.height * 0.4,
             ),
             const Spacer(flex: 1),
-            // Textos
             const Text(
               'Envío de comandos',
               style: TextStyle(
@@ -83,7 +81,6 @@ class OnboardingscreenTwo extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const Spacer(flex: 3),
-            // Navegación inferior
             _buildNavigation(context),
             const SizedBox(height: 40),
           ],
@@ -92,13 +89,11 @@ class OnboardingscreenTwo extends StatelessWidget {
     );
   }
 
-  /// Widget que construye la navegación inferior (indicadores y botón).
   Widget _buildNavigation(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Indicador de página
         Row(
           children: [
             _buildIndicator(isActive: false, width: 20.0),
@@ -108,7 +103,6 @@ class OnboardingscreenTwo extends StatelessWidget {
             _buildIndicator(isActive: false, width: 20.0),
           ],
         ),
-        // Botón de continuar
         ElevatedButton(
           onPressed: () {
             pageController.nextPage(
@@ -137,7 +131,6 @@ class OnboardingscreenTwo extends StatelessWidget {
     );
   }
 
-  /// Widget para construir un solo punto del indicador de página.
   Widget _buildIndicator({required bool isActive, double width = 8.0}) {
     return Container(
       width: width,

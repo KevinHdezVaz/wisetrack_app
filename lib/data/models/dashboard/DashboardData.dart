@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-/// Modelo para la respuesta completa del endpoint de datos del dashboard.
 class DashboardDataResponse {
   final DashboardData data;
 
@@ -13,7 +12,6 @@ class DashboardDataResponse {
   }
 }
 
-/// Representa el conjunto de datos consolidados para el dashboard.
 class DashboardData {
   final Map<String, int> vehicleTypes;
   final Map<String, int> vehicleStatus;
@@ -32,15 +30,16 @@ class DashboardData {
   });
 
   factory DashboardData.fromJson(Map<String, dynamic> json) {
-    // Helper para convertir un Map<String, dynamic> a Map<String, int> de forma segura.
     Map<String, int> _parseMap(Map<String, dynamic>? data) {
       if (data == null) return {};
-      return data.map((key, value) => MapEntry(key, (value as num?)?.toInt() ?? 0));
+      return data
+          .map((key, value) => MapEntry(key, (value as num?)?.toInt() ?? 0));
     }
 
     return DashboardData(
       vehicleTypes: _parseMap(json['d_vehicles_type'] as Map<String, dynamic>?),
-      vehicleStatus: _parseMap(json['d_vehicles_status'] as Map<String, dynamic>?),
+      vehicleStatus:
+          _parseMap(json['d_vehicles_status'] as Map<String, dynamic>?),
       alertPlan: _parseMap(json['d_alert_plan'] as Map<String, dynamic>?),
       totalVehicles: json['total_vehicles'] as int? ?? 0,
       totalAlerts: json['total_alerts'] as int? ?? 0,

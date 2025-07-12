@@ -2,11 +2,9 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/User/UserDetail.dart';
- 
+
 class UserCacheService {
   static const String _userCacheKey = 'current_user_data';
-
-  /// Guarda el objeto UserData en SharedPreferences convirtiéndolo a un String JSON.
   static Future<void> saveUserData(UserData userData) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -18,8 +16,6 @@ class UserCacheService {
     }
   }
 
-  /// Lee el String JSON de SharedPreferences y lo convierte de nuevo a un objeto UserData.
-  /// Devuelve null si no hay datos guardados.
   static Future<UserData?> getCachedUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -36,7 +32,6 @@ class UserCacheService {
     return null;
   }
 
-  /// Limpia los datos del usuario de la caché. Esencial para el logout.
   static Future<void> clearUserData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userCacheKey);

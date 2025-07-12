@@ -14,20 +14,15 @@ class OnboardingScreenOne extends StatelessWidget {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // 1. WIDGET PARA LA IMAGEN DE FONDO
-          // Coloca la imagen en la parte superior de la pantalla.
           Positioned(
             top: 0,
             right: 0,
             child: Image.asset(
-              // Asegúrate de que esta ruta sea correcta
               'assets/images/rectangle1.png',
               width: MediaQuery.of(context).size.width * 0.5,
               fit: BoxFit.contain,
             ),
           ),
-
-          // Contenido principal de la pantalla
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -36,14 +31,11 @@ class OnboardingScreenOne extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(height: 60),
-                  // Imagen principal de la ilustración
                   Image.asset(
                     'assets/images/introPage1.png', // Reemplaza con tu ilustración principal
                     height: 400,
                   ),
                   const SizedBox(height: 50),
-
-                  // Título principal
                   const Text(
                     'Seguimiento en línea',
                     style: TextStyle(
@@ -54,8 +46,6 @@ class OnboardingScreenOne extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 10),
-
-                  // Subtítulo
                   const Text(
                     'Monitoreo de tu flota en tiempo real.',
                     style: TextStyle(
@@ -65,16 +55,12 @@ class OnboardingScreenOne extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   const Spacer(),
-
-                  // Fila para el indicador de página y el botón
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Indicador de página
                       Row(
                         children: [
-                          // Primer punto (largo)
                           Container(
                             width: 80.0,
                             height: 8.0,
@@ -84,7 +70,6 @@ class OnboardingScreenOne extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8.0),
-                          // Segundo punto (ahora largo)
                           Container(
                             width:
                                 8.0, // Puedes ajustar este valor para cambiar el largo
@@ -96,7 +81,6 @@ class OnboardingScreenOne extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8.0),
-                          // Tercer punto (círculo pequeño)
                           Container(
                             width: 8.0,
                             height: 8.0,
@@ -107,8 +91,6 @@ class OnboardingScreenOne extends StatelessWidget {
                           ),
                         ],
                       ),
-
-                      // Botón de continuar
                       ElevatedButton(
                         onPressed: () {
                           pageController.nextPage(

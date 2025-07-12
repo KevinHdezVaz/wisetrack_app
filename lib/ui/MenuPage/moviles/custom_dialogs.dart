@@ -1,11 +1,8 @@
-// archivo: custom_dialogs.dart
 import 'package:flutter/material.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 
-// Enum para definir el tipo de diálogo
 enum DialogType { success, warning, error }
 
-// Función principal para mostrar cualquier diálogo
 Future<void> showCustomDialog({
   required BuildContext context,
   required DialogType type,
@@ -45,7 +42,6 @@ Future<void> showCustomDialog({
               const SizedBox(height: 8),
               subtitle,
               const SizedBox(height: 24),
-              // El layout de los botones ahora es más flexible
               ...actions,
             ],
           ),
@@ -55,9 +51,6 @@ Future<void> showCustomDialog({
   );
 }
 
-// --- Funciones de ayuda para llamar a cada tipo de diálogo fácilmente ---
-
-// 1. Diálogo de Precaución (Warning) - CORREGIDO
 void showWarningDialog(BuildContext context,
     {required String title,
     required String subtitle,
@@ -75,8 +68,6 @@ void showWarningDialog(BuildContext context,
     subtitle: Text(subtitle,
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 16, color: Colors.black)),
-    // --- INICIO DE LA MODIFICACIÓN ---
-    // En lugar de un Row, pasamos un Column con los botones
     actions: [
       Column(
         children: [
@@ -121,17 +112,14 @@ void showWarningDialog(BuildContext context,
         ],
       ),
     ],
-    // --- FIN DE LA MODIFICACIÓN ---
   );
 }
 
-// 2. Diálogo de Éxito (Sin cambios)
 void showSuccessDialog(BuildContext context,
     {required String title, required String subtitle}) {
   showCustomDialog(
     context: context,
     type: DialogType.success,
-    // Ejemplo en showSuccessDialog:
     title: Text(
       title,
       style: TextStyle(
@@ -161,12 +149,10 @@ void showSuccessDialog(BuildContext context,
   );
 }
 
-// 3. Diálogo de Error (Sin cambios)
 void showErrorDialog(BuildContext context) {
   showCustomDialog(
     context: context,
     type: DialogType.error,
-// Ejemplo en showSuccessDialog:
     title: Text(
       "Ha ocurrido un error.",
       style: TextStyle(

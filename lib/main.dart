@@ -17,7 +17,6 @@ import 'package:wisetrack_app/ui/login/LoginScreen.dart';
 import 'package:wisetrack_app/ui/profile/SettingsScreen.dart';
 import 'package:wisetrack_app/utils/AuthWrapper.dart';
 
-// Configuración para ignorar errores de certificado HTTPS (solo para desarrollo)
 class MyHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
@@ -28,14 +27,11 @@ class MyHttpOverrides extends HttpOverrides {
 }
 
 void main() async {
-   WidgetsFlutterBinding.ensureInitialized(); // Necesario para Firebase
-
-// --- 3. CARGA EL ARCHIVO .ENV ---
+  WidgetsFlutterBinding.ensureInitialized(); // Necesario para Firebase
   await dotenv.load(fileName: ".env");
   print('✅ Archivo de entorno .env cargado.');
 
   try {
-    // --- 4. INICIALIZA FIREBASE USANDO LAS OPCIONES ---
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -44,10 +40,8 @@ void main() async {
     print('❌ Error crítico inicializando Firebase: $e');
     print('Stack trace: $stack');
   }
- 
-   
-  
-   HttpOverrides.global = MyHttpOverrides();  
+
+  HttpOverrides.global = MyHttpOverrides();
   initializeDateFormatting('es_ES', null).then((_) {
     runApp(const MyApp());
   });

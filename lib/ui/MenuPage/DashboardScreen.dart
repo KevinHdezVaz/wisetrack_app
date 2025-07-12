@@ -10,7 +10,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:wisetrack_app/data/models/User/UserDetail.dart';
 import 'dart:async';
 
-// Importaciones de la aplicación
 import 'package:wisetrack_app/data/models/vehicles/Vehicle.dart';
 import 'package:wisetrack_app/data/models/vehicles/VehiclePositionModel.dart';
 import 'package:wisetrack_app/data/services/NotificationsService.dart';
@@ -40,15 +39,12 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
-  // --- Controladores del Mapa y Marcadores ---
   final Completer<GoogleMapController> _mapController = Completer();
   final Set<Marker> _markers = {};
 
-  // --- Estado de Carga y Animación ---
   bool _isLoading = true;
   late AnimationController _animationController;
 
-  // --- Estado para la funcionalidad de Búsqueda ---
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   bool _isSearchFocused = false;
@@ -56,7 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   List<Vehicle> _filteredVehicles = [];
   Map<String, LatLng> _vehiclePositions = {};
   Map<int, String> _vehicleTypeMap = {};
-  UserData? _currentUser; // <-- AÑADE ESTA LÍNEA
+  UserData? _currentUser;
 
   Position? _lastKnownPosition;
   static const double _locationChangeThreshold = 50.0;
@@ -67,8 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   bool _isLoggingOut = false;
   CameraPosition _initialCameraPosition = const CameraPosition(
-    target: LatLng(-32.775,
-        -71.229),  
+    target: LatLng(-32.775, -71.229),
     zoom: 8.0,
   );
 
@@ -84,7 +79,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     _searchFocusNode.addListener(_onSearchFocusChange);
     _searchController.addListener(_filterVehicles);
 
-    // Llama a una única función que orquesta todo el inicio.
     _initializeApp();
   }
 
@@ -97,53 +91,44 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _initializeApp() async {
-    // 1. Muestra el indicador de carga.
     setState(() => _isLoading = true);
     _animationController.repeat();
 
-    // 2. Primero, intenta obtener permisos y la ubicación del usuario.
     await _centerOnUserLocation();
-
-    // 3. Después, carga todos los datos de los vehículos.
     await _initializeDashboardData();
 
     final notificationService = NotificationServiceFirebase();
     await notificationService.initAndSendDeviceData();
 
-    // 5. Oculta el indicador de carga (esto se puede mover
-    // dentro de _initializeDashboardData al final si prefieres).
     if (mounted) {
       setState(() => _isLoading = false);
       _animationController.stop();
     }
   }
 
-// Se ha reducido el tamaño y el padding para que quepan mejor.
   Widget _statusIconShield(String baseName, bool isActive) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0), // Padding reducido
+      padding: const EdgeInsets.symmetric(horizontal: 4.0),
       child: Image.asset(
         'assets/images/shield2.png',
-        width: 22.0, // Tamaño reducido
-        height: 22.0, // Tamaño reducido
+        width: 22.0,
+        height: 22.0,
       ),
     );
   }
 
-  // Se ha reducido el tamaño y el padding para que quepan mejor.
   Widget _statusIcon(String baseName, bool isActive) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0), // Padding reducido
+      padding: const EdgeInsets.symmetric(horizontal: 4.0),
       child: Image.asset(
         'assets/images/${baseName}_${isActive ? 'on' : 'off'}.png',
-        width: 12.0, // Tamaño reducido
-        height: 12.0, // Tamaño reducido
+        width: 12.0,
+        height: 12.0,
       ),
     );
   }
 
   Future<void> _handleInvalidToken() async {
-    // Mostramos un mensaje al usuario
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content:
@@ -152,19 +137,15 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     );
 
-    // Borramos el token inválido del almacenamiento
     await TokenStorage.deleteToken();
 
-    // Esperamos un momento para que el usuario vea el mensaje
     await Future.delayed(const Duration(seconds: 2));
 
-    // Redirigimos al login y limpiamos todas las pantallas anteriores
     if (mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     }
   }
 
-  /// Inicializa todos los datos del dashboard en paralelo para máxima eficiencia.
   Future<void> _initializeDashboardData() async {
     setState(() => _isLoading = true);
     _animationController.repeat();
@@ -187,7 +168,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         for (var type in types) type.id: type.name
       };
 
-      // Procesar marcadores
       await _setupMarkers(positionResponse.data);
 
       if (mounted) {
@@ -196,8 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           _vehicleTypeMap = typesMap;
           _filteredVehicles = List.from(_allVehicles);
           _currentUser = userResponse.data;
-          _isLoading =
-              false; // Mover aquí para que la animación se mantenga hasta que los marcadores estén listos
+          _isLoading = false;
         });
         _animationController.stop();
         _animationController.reset();
@@ -218,7 +197,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       }
     } finally {
       if (mounted && !_isLoggingOut && _isLoading) {
-        // Solo detener si sigue cargando
         setState(() => _isLoading = false);
         _animationController.stop();
         _animationController.reset();
@@ -226,12 +204,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  /// Procesa las posiciones de los vehículos y las convierte en marcadores.
   Future<void> _setupMarkers(List<VehicleCurrentPosition> positions) async {
     final Map<String, LatLng> positionsMap = {};
     final Set<Marker> vehicleMarkers = {};
 
-    // Cargamos todos los íconos primero
     for (final position in positions) {
       final latLng = LatLng(position.latitude, position.longitude);
       positionsMap[position.vehiclePlate] = latLng;
@@ -261,19 +237,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       );
     }
 
-    // Actualizar marcadores en el estado
     if (mounted) {
       setState(() {
         _markers.removeWhere((m) => m.markerId.value != 'user_location');
         _markers.addAll(vehicleMarkers);
         _vehiclePositions = positionsMap;
-        _allMarkers = vehicleMarkers; // Actualizar _allMarkers también
-        _visibleMarkers = vehicleMarkers; // Actualizar _visibleMarkers
+        _allMarkers = vehicleMarkers;
+        _visibleMarkers = vehicleMarkers;
       });
     }
   }
 
-  /// Filtra la lista de vehículos basado en el texto del buscador.
   void _filterVehicles() {
     final query = _searchController.text.toLowerCase();
     setState(() {
@@ -290,14 +264,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
   }
 
-  /// Acción al seleccionar un vehículo de la lista de búsqueda.
   void _onVehicleSelected(Vehicle vehicle) {
     _navigateToDetail(vehicle.plate);
   }
 
-  /// Navega a la pantalla de detalles de un vehículo.
   void _navigateToDetail(String plate) {
-    // Primero, oculta el teclado y la lista de búsqueda para una transición limpia
     _searchFocusNode.unfocus();
     _searchController.clear();
 
@@ -317,72 +288,56 @@ class _DashboardScreenState extends State<DashboardScreen>
       return _markerCache[cacheKey]!;
     }
 
-    // 1. Cargar imágenes
     final Uint8List baseIcon = await _loadAsset(
       isIgnitionOn
           ? 'assets/images/icons/market_green.png'
           : 'assets/images/icons/market_red2.png',
     );
 
-    // 2. Convertir la imagen base
     final baseCodec = await ui.instantiateImageCodec(baseIcon);
     final baseFrame = await baseCodec.getNextFrame();
     final baseImage = baseFrame.image;
 
-    // 3. Crear canvas
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(
         recorder,
         Rect.fromLTRB(
             0, 0, baseImage.width.toDouble(), baseImage.height.toDouble()));
 
-    // 4. Dibujar imagen base
     canvas.drawImage(baseImage, Offset.zero, Paint());
 
-    // 5. Dibujar la flecha solo si isIgnitionOn es true
     if (isIgnitionOn) {
-      // Cargar la imagen de la flecha
       final Uint8List arrowIcon =
           await _loadAsset('assets/images/icons/arrow2.png');
 
-      // Convertir la imagen de la flecha
       final arrowCodec = await ui.instantiateImageCodec(arrowIcon);
       final arrowFrame = await arrowCodec.getNextFrame();
       final arrowImage = arrowFrame.image;
 
-      // Configuración de tamaño y posición
-      final desiredArrowWidth =
-          baseImage.width * 0.5; // 50% del ancho del marcador
+      final desiredArrowWidth = baseImage.width * 0.5;
       final scaleFactor = desiredArrowWidth / arrowImage.width;
       final scaledArrowHeight = arrowImage.height * scaleFactor;
 
-      // Dibujar flecha centrada y ajustada
       canvas.save();
 
-      // Mover el punto de origen al centro del marcador con ajuste vertical
       canvas.translate(
           baseImage.width / 2, (baseImage.height / 2) + verticalAdjustment);
 
-      // Aplicar rotación (con ajuste para que 0° sea Norte)
       canvas.rotate((direction - 90) * pi / 180);
 
-      // Aplicar escala para cambiar el tamaño
       canvas.scale(scaleFactor, scaleFactor);
 
-      // Dibujar la flecha compensando por su centro
       canvas.drawImage(arrowImage,
           Offset(-arrowImage.width / 2, -arrowImage.height / 2), Paint());
 
       canvas.restore();
     }
 
-    // 6. Convertir a BitmapDescriptor
     final picture = recorder.endRecording();
     final image = await picture.toImage(baseImage.width, baseImage.height);
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     final bytes = byteData!.buffer.asUint8List();
 
-    // 7. Guardar en caché
     final descriptor = BitmapDescriptor.fromBytes(bytes);
     _markerCache[cacheKey] = descriptor;
 
@@ -391,11 +346,9 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Future<BitmapDescriptor> _createDirectionalMarker(
       Uint8List baseImage, int direction) async {
-    // Cargar la imagen de la flecha (necesitarás un asset de flecha blanca/simple)
     final Uint8List arrowIcon =
         await _loadAsset('assets/images/icons/arrow.png');
 
-    // Convertir las imágenes a formatos editables
     final codec = await instantiateImageCodec(baseImage);
     final frame = await codec.getNextFrame();
     final baseImageBitmap = frame.image;
@@ -404,7 +357,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     final arrowFrame = await arrowCodec.getNextFrame();
     final arrowBitmap = arrowFrame.image;
 
-    // Crear un PictureRecorder y Canvas para dibujar
     final recorder = PictureRecorder();
     final canvas = Canvas(
         recorder,
@@ -414,25 +366,20 @@ class _DashboardScreenState extends State<DashboardScreen>
               baseImageBitmap.height.toDouble()),
         ));
 
-    // Dibujar la imagen base
     canvas.drawImage(baseImageBitmap, Offset.zero, Paint());
 
-    // Dibujar la flecha rotada según la dirección
     final arrowPaint = Paint();
     final arrowSize =
         Size(arrowBitmap.width.toDouble(), arrowBitmap.height.toDouble());
 
-    // Centrar la flecha en el marcador
     final centerX = baseImageBitmap.width / 2;
     final centerY = baseImageBitmap.height / 2;
 
-    // Guardar el estado del canvas para la rotación
     canvas.save();
     canvas.translate(centerX, centerY);
-    canvas.rotate((direction * pi) / 180); // Convertir grados a radianes
+    canvas.rotate((direction * pi) / 180);
     canvas.translate(-centerX, -centerY);
 
-    // Dibujar la flecha (ajustar posición según sea necesario)
     canvas.drawImage(
       arrowBitmap,
       Offset(centerX - arrowSize.width / 2, centerY - arrowSize.height / 2),
@@ -441,7 +388,6 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     canvas.restore();
 
-    // Convertir el canvas a imagen y luego a bytes
     final picture = recorder.endRecording();
     final image = await picture.toImage(
       baseImageBitmap.width,
@@ -459,7 +405,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     return data.buffer.asUint8List();
   }
 
-  /// Devuelve el IconData apropiado para el nombre del tipo de vehículo.
   String _getIconPathForVehicleType(String typeName) {
     final normalizedTypeName =
         typeName.toLowerCase().replaceAll(' ', '_').replaceAll('/', '_');
@@ -501,15 +446,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       case 'bus':
         return 'assets/images/icons/bus.png';
       default:
-        return 'assets/images/icons/otro.png'; // Un ícono por defecto
+        return 'assets/images/icons/otro.png';
     }
   }
 
-  /// Filtra la lista de vehículos Y los marcadores del mapa.
   void _applyFilters() {
     final query = _searchController.text.toLowerCase();
 
-    // 1. Filtra la lista de vehículos para la búsqueda
     final filteredVehicles = _allVehicles.where((vehicle) {
       final vehicleTypeName = _vehicleTypeMap[vehicle.vehicleType] ?? '';
 
@@ -537,7 +480,6 @@ class _DashboardScreenState extends State<DashboardScreen>
           engineStatusMatches;
     }).toList();
 
-    // 2. Filtra los marcadores del mapa
     final Set<String> filteredPlates =
         filteredVehicles.map((v) => v.plate).toSet();
     final Set<Marker> visibleMarkers = _allMarkers.where((marker) {
@@ -545,14 +487,12 @@ class _DashboardScreenState extends State<DashboardScreen>
           filteredPlates.contains(marker.markerId.value);
     }).toSet();
 
-    // 3. Actualiza el estado
     setState(() {
       _filteredVehicles = filteredVehicles;
       _visibleMarkers = visibleMarkers;
     });
   }
 
-  /// Maneja el cambio de foco en el campo de búsqueda.
   void _onSearchFocusChange() {
     setState(() {
       _isSearchFocused = _searchFocusNode.hasFocus;
@@ -567,41 +507,35 @@ class _DashboardScreenState extends State<DashboardScreen>
           drawer: AppDrawer(onLogout: _logout),
           body: Stack(
             children: [
-               if (!_isLoading)
-            GoogleMap(
-              mapType: MapType.normal,
-              initialCameraPosition: _initialCameraPosition,
-              onMapCreated: (GoogleMapController controller) {
-                if (!_mapController.isCompleted) {
-                  _mapController.complete(controller);
-                }
-              },
-              markers: _markers,
-              myLocationEnabled: true,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              onTap: (_) => _searchFocusNode.unfocus(),
-            ),
-          
-          // Muestra la barra de búsqueda y botones solo si no está cargando
-          if (!_isLoading) _buildTopSearchBar(),
-          if (!_isLoading) _buildFloatingActionButtons(),
-
-          // El indicador de carga se muestra encima de todo cuando es necesario.
-          if (_isLoading || _isLoggingOut)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withOpacity(0.5),
-                child: AnimatedTruckProgress(animation: _animationController),
-              ),
-            ),
-     
- 
-            
+              if (!_isLoading)
+                GoogleMap(
+                  mapType: MapType.normal,
+                  initialCameraPosition: _initialCameraPosition,
+                  onMapCreated: (GoogleMapController controller) {
+                    if (!_mapController.isCompleted) {
+                      _mapController.complete(controller);
+                    }
+                  },
+                  markers: _markers,
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: false,
+                  zoomControlsEnabled: false,
+                  onTap: (_) => _searchFocusNode.unfocus(),
+                ),
+              if (!_isLoading) _buildTopSearchBar(),
+              if (!_isLoading) _buildFloatingActionButtons(),
+              if (_isLoading || _isLoggingOut)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withOpacity(0.5),
+                    child:
+                        AnimatedTruckProgress(animation: _animationController),
+                  ),
+                ),
             ],
           ),
         ),
-        if (_isLoading || _isLoggingOut) // Agrega _isLoggingOut aquí
+        if (_isLoading || _isLoggingOut)
           Positioned.fill(
             child: AnimatedTruckProgress(animation: _animationController),
           ),
@@ -685,7 +619,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  /// **CORREGIDO**: Lógica de permisos y ubicación simplificada y robusta.
   Future<void> _centerOnUserLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -739,8 +672,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-// En DashboardScreen.dart
-  // --- MODIFICACIÓN PRINCIPAL AQUÍ ---
   Widget _buildSearchResultsList() {
     if (!_isSearchFocused || _filteredVehicles.isEmpty) {
       return const SizedBox.shrink();
@@ -775,13 +706,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ? AppColors.primary.withOpacity(0.8)
                 : Colors.red.shade400;
 
-            // --- Lógica completa para los 4 íconos ---
             bool isLocationActive = vehicle.statusVehicle == 1;
             bool isGpsActive = vehicle.statusDevice == 1;
-            bool isKeyActive =
-                false; // Reemplazar con lógica real si está disponible
-            bool isShieldActive =
-                false; // Reemplazar con lógica real si está disponible
+            bool isKeyActive = false;
+            bool isShieldActive = false;
 
             return ListTile(
               leading: GestureDetector(
@@ -807,8 +735,6 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               onTap: () => _onVehicleSelected(vehicle),
               dense: true,
-
-              // --- INICIO: Mostrar los 4 íconos de estado ---
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -817,9 +743,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   _statusIcon('llave', isKeyActive),
                   GestureDetector(
                     onTap: () {
-                      // Oculta el teclado y la lista para una transición limpia.
                       _searchFocusNode.unfocus();
-                      // Navega a la pantalla de seguridad, pasando la patente.
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -833,7 +757,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                 ],
               ),
-              // --- FIN: Mostrar los 4 íconos de estado ---
             );
           },
           separatorBuilder: (context, index) =>
@@ -844,16 +767,14 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _logout() async {
-    if (_isLoggingOut) return; // Evita múltiples llamadas
+    if (_isLoggingOut) return;
 
     setState(() => _isLoggingOut = true);
-    _animationController.repeat(); // Inicia la animación
+    _animationController.repeat();
 
     try {
-      // 1. Ejecutar el logout en el backend
       final logoutResponse = await AuthService.logout();
 
-      // 2. Mostrar feedback al usuario según la respuesta
       if (logoutResponse.detail == null ||
           logoutResponse.detail!.contains('Error')) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -863,7 +784,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             backgroundColor: Colors.red,
           ),
         );
-      } else {}
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -872,10 +793,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       );
     } finally {
-      // Asegurarse de eliminar el token incluso si falla el logout
       await TokenStorage.deleteToken();
 
-      // Detener y resetear la animación
       _animationController.stop();
       _animationController.reset();
 
@@ -883,7 +802,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         setState(() => _isLoggingOut = false);
       }
 
-      // Navegar al login de todas formas
       Navigator.pushNamedAndRemoveUntil(
         context,
         '/login',
@@ -892,13 +810,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  /// Actualiza o remueve el marcador de la ubicación actual del usuario.
   void _updateUserLocationMarker(Position position) {
     setState(() {
-      // Removemos el marcador anterior si existe.
       _markers
           .removeWhere((m) => m.markerId == const MarkerId('user_location'));
-      // No añadimos ningún marcador nuevo, solo dejamos el punto azul nativo
     });
   }
 
@@ -906,7 +821,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     return FutureBuilder<UserDetailResponse>(
       future: UserService.getUserDetail(),
       builder: (context, snapshot) {
-        // Definimos el ImageProvider basado en el estado
         final ImageProvider? profileImage =
             (snapshot.connectionState == ConnectionState.done &&
                     snapshot.hasData &&
@@ -930,7 +844,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white, // Fondo blanco
+                    color: Colors.white,
                     shape: BoxShape.circle,
                     image: profileImage != null
                         ? DecorationImage(
@@ -968,7 +882,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       );
 
-      // Salimos del método
       return;
     }
 
@@ -988,9 +901,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     await controller.showMarkerInfoWindow(MarkerId(vehicle.plate));
   }
 
-  /// Abre el BottomSheet y aplica los filtros seleccionados.
   void _openFilterBottomSheet() async {
-    _searchFocusNode.unfocus(); // Cierra el teclado si está abierto
+    _searchFocusNode.unfocus();
     final Set<String>? newFilters = await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1003,7 +915,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (newFilters != null && mounted) {
       setState(() {
         _currentFilters = newFilters;
-        _applyFilters(); // Vuelve a aplicar todos los filtros
+        _applyFilters();
       });
     }
   }
@@ -1028,7 +940,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   fit: BoxFit.cover,
                 ),
               ),
-              alignment: Alignment.center, // Añade esto
+              alignment: Alignment.center,
               child: Image.asset(
                 'assets/images/mas.png',
                 width: 20,
@@ -1051,7 +963,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   fit: BoxFit.cover,
                 ),
               ),
-              alignment: Alignment.center, // Añade esto
+              alignment: Alignment.center,
               child: Image.asset(
                 'assets/images/menos.png',
                 width: 20,
@@ -1072,7 +984,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   fit: BoxFit.cover,
                 ),
               ),
-              alignment: Alignment.center, // Añade esto
+              alignment: Alignment.center,
               child: Image.asset(
                 'assets/images/gps.png',
                 width: 20,

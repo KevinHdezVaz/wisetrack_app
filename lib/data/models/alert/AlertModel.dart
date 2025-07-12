@@ -1,8 +1,5 @@
-// lib/data/models/alerts/AlertModel.dart
-
 import 'dart:convert';
 
-/// Modelo para la respuesta completa de la API, que contiene una lista de alertas.
 class AlertsResponse {
   final List<Alertas> data;
 
@@ -11,13 +8,13 @@ class AlertsResponse {
   factory AlertsResponse.fromJson(Map<String, dynamic> json) {
     final list = json['data'] as List<dynamic>? ?? [];
     return AlertsResponse(
-      data: list.map((item) => Alertas.fromJson(item as Map<String, dynamic>)).toList(),
+      data: list
+          .map((item) => Alertas.fromJson(item as Map<String, dynamic>))
+          .toList(),
     );
   }
 }
 
-/// Modelo para una única alerta.
-/// ESTA ES LA VERSIÓN COMPLETA QUE INCLUYE 'name' Y 'alertDate'.
 class Alertas {
   final String name;
   final String plate;
@@ -46,14 +43,12 @@ class Alertas {
   });
 
   factory Alertas.fromJson(Map<String, dynamic> json) {
-    // Helper para parsear números de forma segura
     double? safeParseDouble(dynamic value) {
       if (value is num) return value.toDouble();
       if (value is String) return double.tryParse(value);
       return null;
     }
 
-    // Helper para parsear fechas de forma segura
     DateTime? safeParseDateTime(dynamic value) {
       if (value is String) return DateTime.tryParse(value);
       return null;
@@ -69,15 +64,14 @@ class Alertas {
       driverName: json['driver_name'] as String? ?? 'Sin conductor',
       geofenceName: json['geofence_name'] as String?,
       status: json['status'] as int? ?? 0,
-      alertType: AlertType.fromJson(json['alert_type'] as Map<String, dynamic>? ?? {}),
-      vehicle: AlertVehicle.fromJson(json['vehicle'] as Map<String, dynamic>? ?? {}),
+      alertType:
+          AlertType.fromJson(json['alert_type'] as Map<String, dynamic>? ?? {}),
+      vehicle:
+          AlertVehicle.fromJson(json['vehicle'] as Map<String, dynamic>? ?? {}),
     );
   }
 }
 
-/// Modelo para el objeto anidado 'alert_type'.
-
-/// Modelo extendido para el tipo de alerta (ahora incluye id)
 class AlertType {
   final int id;
   final String name;
@@ -101,7 +95,7 @@ class AlertType {
     };
   }
 }
-/// Modelo para el objeto anidado 'vehicle'.
+
 class AlertVehicle {
   final String plate;
 
@@ -114,7 +108,6 @@ class AlertVehicle {
   }
 }
 
-/// Modelo para la respuesta de tipos de alerta
 class AlertTypesResponse {
   final List<AlertType> data;
 
@@ -123,7 +116,9 @@ class AlertTypesResponse {
   factory AlertTypesResponse.fromJson(Map<String, dynamic> json) {
     final list = json['data'] as List<dynamic>? ?? [];
     return AlertTypesResponse(
-      data: list.map((item) => AlertType.fromJson(item as Map<String, dynamic>)).toList(),
+      data: list
+          .map((item) => AlertType.fromJson(item as Map<String, dynamic>))
+          .toList(),
     );
   }
 }

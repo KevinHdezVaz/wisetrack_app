@@ -1,8 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
-// Importaciones de la aplicación
 import 'package:wisetrack_app/data/models/BarChartDataModel.dart';
 import 'package:wisetrack_app/data/models/dashboard/DashboardDetailModel.dart';
 import 'package:wisetrack_app/data/services/DashboardService.dart';
@@ -22,7 +20,8 @@ class DataVisualizationDetail extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _DataVisualizationDetailState createState() => _DataVisualizationDetailState();
+  _DataVisualizationDetailState createState() =>
+      _DataVisualizationDetailState();
 }
 
 class _DataVisualizationDetailState extends State<DataVisualizationDetail>
@@ -174,7 +173,8 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail>
               children: [
                 _buildDatePicker(context),
                 const SizedBox(height: 16),
-                _buildChartCard(chartData, maxValue, detailData.total.toString()),
+                _buildChartCard(
+                    chartData, maxValue, detailData.total.toString()),
                 const SizedBox(height: 100),
               ],
             ),
@@ -235,7 +235,8 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail>
     );
   }
 
-  Widget _buildChartCard(List<BarChartDataModel> data, double maxValue, String totalValue) {
+  Widget _buildChartCard(
+      List<BarChartDataModel> data, double maxValue, String totalValue) {
     return Card(
       color: Colors.white,
       elevation: 0,
@@ -255,7 +256,8 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail>
     );
   }
 
-  Widget _buildHorizontalBarChart(List<BarChartDataModel> data, double maxValue) {
+  Widget _buildHorizontalBarChart(
+      List<BarChartDataModel> data, double maxValue) {
     if (data.isEmpty) {
       return const SizedBox(
           height: 100,
@@ -302,7 +304,8 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail>
                         : 0;
                     return Container(
                       height: 20,
-                      width: barWidth.clamp(0.0, constraints.maxWidth).toDouble(),
+                      width:
+                          barWidth.clamp(0.0, constraints.maxWidth).toDouble(),
                       decoration: BoxDecoration(
                         color: item.color,
                         borderRadius: BorderRadius.circular(4),
@@ -327,7 +330,8 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail>
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(numberOfLabels, (index) {
-              int labelValue = (maxValue / (numberOfLabels - 1) * index).round();
+              int labelValue =
+                  (maxValue / (numberOfLabels - 1) * index).round();
               return Text(
                 labelValue.toString(),
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
@@ -348,7 +352,8 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail>
           const Text('Total:', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(width: 8),
           Text(totalValue,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ],
       ),
     );
@@ -370,11 +375,14 @@ class _DataVisualizationDetailState extends State<DataVisualizationDetail>
         child: ElevatedButton.icon(
           onPressed: _isLoading ? null : () => _generatePdfReport(data),
           icon: const Icon(Icons.download, color: Colors.white),
-          label: const Text('Descargar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          label: const Text('Descargar',
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           style: ElevatedButton.styleFrom(
             backgroundColor: _isLoading ? Colors.grey : AppColors.primary,
             padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.0)),
           ),
         ),
       ),

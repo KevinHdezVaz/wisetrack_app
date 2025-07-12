@@ -35,7 +35,7 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
   final GlobalKey _dashboardKey = GlobalKey();
 
   bool _isLoading = true;
-  bool _isGeneratingPdf = false; // New variable for PDF generation loading state
+  bool _isGeneratingPdf = false;
   String? _errorMessage;
   DateTime _selectedDate = DateTime.now();
   final List<String> _timeRanges = ['24 horas', '12 horas', '8 horas'];
@@ -52,21 +52,19 @@ class _AuditDetailsScreenState extends State<AuditDetailsScreen>
   String _maxSpeed = "0 km/h";
   String _totalTime = "00:00:00";
 
-UserData? _cachedUser;
+  UserData? _cachedUser;
 
-@override
-void initState() {
-  super.initState();
-  _animationController =
-      AnimationController(vsync: this, duration: const Duration(seconds: 5));
-  
-  // 2. Llama a las funciones para cargar tus datos
-  _loadUserData(); // <-- AÑADE ESTA LÍNEA
-  _fetchHistory();
-  
-  WidgetsBinding.instance.addPostFrameCallback((_) => _setMapPadding());
-}
+  @override
+  void initState() {
+    super.initState();
+    _animationController =
+        AnimationController(vsync: this, duration: const Duration(seconds: 5));
 
+    _loadUserData();
+    _fetchHistory();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _setMapPadding());
+  }
 
   @override
   void dispose() {
@@ -86,14 +84,14 @@ void initState() {
     });
   }
 
-Future<void> _loadUserData() async {
-  final user = await UserCacheService.getCachedUserData();
-  if (mounted) {
-    setState(() {
-      _cachedUser = user;
-    });
+  Future<void> _loadUserData() async {
+    final user = await UserCacheService.getCachedUserData();
+    if (mounted) {
+      setState(() {
+        _cachedUser = user;
+      });
+    }
   }
-}
 
   Future<void> _fetchHistory() async {
     setState(() {
@@ -158,13 +156,11 @@ Future<void> _loadUserData() async {
     }
     _markers.clear();
     if (points.isNotEmpty) {
-     BitmapDescriptor customIcon = await _getMarkerIconFromAsset(
-      'assets/images/truck_check.png',
-      width: 130, // Ajusta este valor (en píxeles) según el tamaño que desees
-    );
+      BitmapDescriptor customIcon = await _getMarkerIconFromAsset(
+        'assets/images/truck_check.png',
+        width: 130,
+      );
 
-  
- 
       if (!mounted) return;
       _markers.add(Marker(
         markerId: const MarkerId('start'),
@@ -258,28 +254,20 @@ Future<void> _loadUserData() async {
     });
   }
 
-  // Coloca esta función dentro de tu clase _AuditDetailsScreenState
-
-Future<BitmapDescriptor> _getMarkerIconFromAsset(String assetPath, {int width = 120}) async {
-  // Carga la imagen desde los assets
-  final ByteData data = await rootBundle.load(assetPath);
-  
-  // Decodifica la imagen, especificando el ancho de destino para redimensionarla
-  final ui.Codec codec = await ui.instantiateImageCodec(
-    data.buffer.asUint8List(),
-    targetWidth: width,
-  );
-  
-  // Obtiene el primer frame de la imagen ya redimensionada
-  final ui.FrameInfo fi = await codec.getNextFrame();
-  
-  // Convierte la imagen a bytes en formato PNG
-  final Uint8List? resizedBytes = (await fi.image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
-  
-  // Crea el BitmapDescriptor desde los bytes de la imagen redimensionada
-  return BitmapDescriptor.fromBytes(resizedBytes!);
-}
-
+  Future<BitmapDescriptor> _getMarkerIconFromAsset(String assetPath,
+      {int width = 120}) async {
+    final ByteData data = await rootBundle.load(assetPath);
+    final ui.Codec codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: width,
+    );
+    final ui.FrameInfo fi = await codec.getNextFrame();
+    final Uint8List? resizedBytes =
+        (await fi.image.toByteData(format: ui.ImageByteFormat.png))
+            ?.buffer
+            .asUint8List();
+    return BitmapDescriptor.fromBytes(resizedBytes!);
+  }
 
   Future<void> _showCustomDatePicker(BuildContext context) async {
     final DateTime? pickedDate = await showDialog<DateTime>(
@@ -299,7 +287,6 @@ Future<BitmapDescriptor> _getMarkerIconFromAsset(String assetPath, {int width = 
       if (renderObject is! RenderRepaintBoundary) {
         throw Exception('No se encontró el RepaintBoundary');
       }
-
       final image = await renderObject.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
@@ -310,46 +297,36 @@ Future<BitmapDescriptor> _getMarkerIconFromAsset(String assetPath, {int width = 
   }
 
   Future<void> _generatePdfReport() async {
-try {
-  // 1. Captura los widgets PRIMERO, mientras la UI está limpia
-  final dashboardImage = await _captureWidget(_dashboardKey);
-  
-  Uint8List? mapImage;
-  if (Platform.isIOS) {
-    final GoogleMapController mapController = await _mapController.future;
-    mapImage = await mapController.takeSnapshot();
-  } else {
-    mapImage = await _captureWidget(_repaintBoundaryKey);
-  }
-
-  // 2. AHORA SÍ, activa el estado de carga para el resto del proceso
-  setState(() {
-    _isGeneratingPdf = true;
-  });
-  _animationController.repeat();
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Generando reporte...')),
-  );
-  
-  if (mapImage == null || dashboardImage == null) {
-    throw Exception('Error al capturar los componentes');
-  }
-
-      // Cargar el logo de la app
+    try {
+      final dashboardImage = await _captureWidget(_dashboardKey);
+      Uint8List? mapImage;
+      if (Platform.isIOS) {
+        final GoogleMapController mapController = await _mapController.future;
+        mapImage = await mapController.takeSnapshot();
+      } else {
+        mapImage = await _captureWidget(_repaintBoundaryKey);
+      }
+      setState(() {
+        _isGeneratingPdf = true;
+      });
+      _animationController.repeat();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Generando reporte...')),
+      );
+      if (mapImage == null || dashboardImage == null) {
+        throw Exception('Error al capturar los componentes');
+      }
       final logo = await rootBundle.load('assets/images/fondoapp.jpg');
       final logoImage = pw.MemoryImage(logo.buffer.asUint8List());
-
-      // Crear PDF con diseño mejorado
       final pdf = pw.Document();
-
-      // Prepara todos los widgets asíncronos primero
-      final distanceRow = await _buildEnhancedMetricRow('Distancia Recorrida', _distanceTraveled, 'coche.png');
-      final speedRow = await _buildEnhancedMetricRow('Velocidad Promedio', _averageSpeed, 'speed.png');
-      final maxSpeedRow = await _buildEnhancedMetricRow('Velocidad Máxima', _maxSpeed, 'warning.png');
-      final timeRow = await _buildEnhancedMetricRow('Tiempo Total', _totalTime, 'timer.png');
-
-      // ===== PÁGINA 1: MAPA Y ENCABEZADO =====
+      final distanceRow = await _buildEnhancedMetricRow(
+          'Distancia Recorrida', _distanceTraveled, 'coche.png');
+      final speedRow = await _buildEnhancedMetricRow(
+          'Velocidad Promedio', _averageSpeed, 'speed.png');
+      final maxSpeedRow = await _buildEnhancedMetricRow(
+          'Velocidad Máxima', _maxSpeed, 'warning.png');
+      final timeRow = await _buildEnhancedMetricRow(
+          'Tiempo Total', _totalTime, 'timer.png');
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
@@ -357,7 +334,6 @@ try {
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                // Encabezado con logo
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
@@ -377,10 +353,7 @@ try {
                     ),
                   ],
                 ),
-
                 pw.SizedBox(height: 10),
-
-                // Fecha y rango
                 pw.Container(
                   padding: const pw.EdgeInsets.symmetric(vertical: 8),
                   decoration: pw.BoxDecoration(
@@ -402,35 +375,31 @@ try {
                     ],
                   ),
                 ),
-
                 pw.SizedBox(height: 40),
-
-                // Mapa
-              pw.Row(
-  mainAxisAlignment: pw.MainAxisAlignment.center,
-  children: [
-    pw.Container(
-      height: 500,
-      width: 400,
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.grey200, width: 1),
-        borderRadius: pw.BorderRadius.circular(8),
-      ),
-      child: mapImage != null 
-          ? pw.Image(pw.MemoryImage(mapImage!))
-          : pw.Center(child: pw.Text('No se pudo cargar el mapa')),
-    ),
-  ],
-),
-
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.center,
+                  children: [
+                    pw.Container(
+                      height: 500,
+                      width: 400,
+                      decoration: pw.BoxDecoration(
+                        border:
+                            pw.Border.all(color: PdfColors.grey200, width: 1),
+                        borderRadius: pw.BorderRadius.circular(8),
+                      ),
+                      child: mapImage != null
+                          ? pw.Image(pw.MemoryImage(mapImage))
+                          : pw.Center(
+                              child: pw.Text('No se pudo cargar el mapa')),
+                    ),
+                  ],
+                ),
                 pw.SizedBox(height: 15),
               ],
             );
           },
         ),
       );
-
-      // Página 2: Detalles
       pdf.addPage(
         pw.Page(
           build: (pw.Context context) {
@@ -456,19 +425,15 @@ try {
           },
         ),
       );
-
-      // Guardar y abrir PDF
       final output = await getTemporaryDirectory();
       final file = File('${output.path}/reporte_${widget.plate}.pdf');
       await file.writeAsBytes(await pdf.save());
-
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Reporte generado exitosamente')),
         );
       }
-
       await OpenFile.open(file.path);
     } catch (e) {
       if (mounted) {
@@ -521,10 +486,11 @@ try {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(label,
-                    style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
-                pw.Text(value,
                     style:
-                        pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                        pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+                pw.Text(value,
+                    style: pw.TextStyle(
+                        fontSize: 14, fontWeight: pw.FontWeight.bold)),
               ],
             ),
           ),
@@ -534,7 +500,8 @@ try {
   }
 
   Future<pw.Widget> _loadIcon(String assetName, {double size = 24}) async {
-    final ByteData data = await rootBundle.load('assets/images/icons/$assetName');
+    final ByteData data =
+        await rootBundle.load('assets/images/icons/$assetName');
     return pw.Image(
       pw.MemoryImage(data.buffer.asUint8List()),
       width: size,
@@ -694,8 +661,8 @@ try {
   }
 
   Widget _buildDownloadButton() {
-    final bool isButtonEnabled = !_isLoading && !_isGeneratingPdf && _historyPoints.isNotEmpty;
-
+    final bool isButtonEnabled =
+        !_isLoading && !_isGeneratingPdf && _historyPoints.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: SizedBox(
@@ -811,7 +778,7 @@ try {
                     onTap: () {
                       setState(() {
                         _selectedRange = range;
-                        _isRangeDropdownOpen = false; // Corrected from _isRangeDropdownOverlay
+                        _isRangeDropdownOpen = false;
                       });
                       _fetchHistory();
                     },
@@ -844,35 +811,31 @@ try {
     );
   }
 
-Widget _buildDriverInfo() {
-  // Obtenemos el nombre y la URL de la imagen. Si son nulos, usamos valores por defecto.
-  final String driverName = _cachedUser?.fullName ?? 'Cargando...';
-  final String? imageUrl = _cachedUser?.userImage;
+  Widget _buildDriverInfo() {
+    final String driverName = _cachedUser?.fullName ?? 'Cargando...';
+    final String? imageUrl = _cachedUser?.userImage;
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundColor: Colors.grey.shade200,
+          backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
+              ? NetworkImage(imageUrl)
+              : null,
+          child: (imageUrl == null || imageUrl.isEmpty)
+              ? const Icon(Icons.person, color: Colors.grey)
+              : null,
+        ),
+        const SizedBox(width: 12),
+        const Text('Conductor',
+            style: TextStyle(color: Colors.grey, fontSize: 14)),
+        const Spacer(),
+        Text(driverName,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+      ],
+    );
+  }
 
-  return Row(
-    children: [
-      CircleAvatar(
-        radius: 20,
-        backgroundColor: Colors.grey.shade200, // Color de fondo por si la imagen falla
-        // Si la URL de la imagen existe y no está vacía, la usamos.
-        backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
-            ? NetworkImage(imageUrl)
-            : null,
-        // Si no hay imagen, mostramos un ícono de persona.
-        child: (imageUrl == null || imageUrl.isEmpty)
-            ? const Icon(Icons.person, color: Colors.grey)
-            : null,
-      ),
-      const SizedBox(width: 12),
-      const Text('Conductor',
-          style: TextStyle(color: Colors.grey, fontSize: 14)),
-      const Spacer(),
-      // Usamos el nombre del conductor cargado desde el caché.
-      Text(driverName,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-    ],
-  );
-}
   Widget _buildMetricCard(String value, String label) {
     return SizedBox(
       width: 130,

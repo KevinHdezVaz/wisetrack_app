@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wisetrack_app/data/services/auth_api_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/login/VerificationCodeScreen.dart';
- import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';  
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({Key? key}) : super(key: key);
@@ -12,7 +12,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
-    with SingleTickerProviderStateMixin {  
+    with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
   bool _isButtonEnabled = false;
   bool _isLoading = false;
@@ -58,7 +58,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     setState(() {
       _isLoading = true;
     });
-    
+
     _animationController.repeat();
 
     try {
@@ -71,7 +71,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
       if (response.success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message ?? 'Código enviado con éxito')),
+          SnackBar(
+              content: Text(response.message ?? 'Código enviado con éxito')),
         );
         Navigator.push(
           context,
@@ -81,7 +82,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message ?? 'Error al enviar el código')),
+          SnackBar(
+              content: Text(response.message ?? 'Error al enviar el código')),
         );
       }
     } catch (e) {
@@ -131,11 +133,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
             left: 16.0,
             child: _buildBackButton(context),
           ),
-          // --- AQUÍ SE MUESTRA EL OVERLAY DE CARGA ---
           if (_isLoading)
             Center(
               child: AnimatedTruckProgress(
-                // Pasamos el controlador completo, no solo el valor
                 animation: _animationController,
               ),
             ),
@@ -166,7 +166,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   Widget _buildBackground(BuildContext context) {
-    // Asegúrate de tener estas imágenes en tus assets
     return Stack(
       children: [
         Positioned(
@@ -190,6 +189,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       ],
     );
   }
+
   Widget _buildHeader() {
     return Column(
       children: const [
@@ -202,7 +202,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         ),
         SizedBox(height: 16),
         Text(
-          'Ingresa tu correo electrónico para recibir el código de restablecimiento', 
+          'Ingresa tu correo electrónico para recibir el código de restablecimiento',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 16, color: Colors.black),
         ),
@@ -247,7 +247,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        // Llamamos al nuevo método refactorizado
         onPressed: (_isButtonEnabled && !_isLoading) ? _requestReset : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: _isButtonEnabled && !_isLoading

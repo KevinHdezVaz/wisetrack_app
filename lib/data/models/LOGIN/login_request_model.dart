@@ -8,8 +8,6 @@ class LoginRequest {
     required this.password,
     required this.company,
   });
-
-  // Convierte el objeto a JSON para enviarlo en la solicitud HTTP.
   Map<String, dynamic> toJson() => {
         'username': username,
         'password': password,
@@ -25,8 +23,6 @@ class LoginResponse {
     required this.token,
     this.error,
   });
-
-  // Constructor desde JSON (respuesta de la API).
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     return LoginResponse(
       token: json['token'] ?? '', // Ajusta según la estructura real.

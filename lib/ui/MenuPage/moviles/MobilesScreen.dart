@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
- import 'package:wisetrack_app/data/services/vehicles_service.dart';
+import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/FilterBottomSheet.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/SecurityActionsScreen.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/VehicleDetailScreen.dart';
@@ -134,7 +134,8 @@ class _MobilesScreenState extends State<MobilesScreen>
       final bool engineStatusMatches = engineStatusFilters.isEmpty ||
           (engineStatusFilters.contains('Encendido') &&
               vehicle.statusVehicle == 1) ||
-          (engineStatusFilters.contains('Apagado') && vehicle.statusVehicle == 0);
+          (engineStatusFilters.contains('Apagado') &&
+              vehicle.statusVehicle == 0);
 
       return matchesSearchQuery &&
           typeMatches &&
@@ -395,31 +396,31 @@ class _MobilesScreenState extends State<MobilesScreen>
     bool isLocationActive = vehicle.statusVehicle == 1;
     bool isGpsActive = vehicle.statusDevice == 1;
     bool isKeyActive = false; // Reemplazar con lógica real si está disponible
-    bool isShieldActive = false; // Reemplazar con lógica real si está disponible
+    bool isShieldActive =
+        false; // Reemplazar con lógica real si está disponible
 
-   return InkWell(
-    onTap: () async {
-      final shouldRefresh = await Navigator.push(
-        context,
-        MaterialPageRoute(
-  builder: (context) => VehicleDetailScreen(
-            plate: vehicle.plate,
-            originScreen: 'mobiles', // Bandera de origen
-            onDataChanged: _refreshVehicles,
+    return InkWell(
+      onTap: () async {
+        final shouldRefresh = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VehicleDetailScreen(
+              plate: vehicle.plate,
+              originScreen: 'mobiles', // Bandera de origen
+              onDataChanged: _refreshVehicles,
+            ),
           ),
-                  ),
-      );
-      
-      if (shouldRefresh == true && mounted) {
-        _refreshVehicles(); // Recargar la lista
-      }
-    },
+        );
+
+        if (shouldRefresh == true && mounted) {
+          _refreshVehicles(); // Recargar la lista
+        }
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 18.0),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Ícono del tipo de vehículo
             CircleAvatar(
               backgroundColor: iconBgColor,
               child: ClipOval(
@@ -433,7 +434,6 @@ class _MobilesScreenState extends State<MobilesScreen>
               ),
             ),
             const SizedBox(width: 16),
-            // Detalles del vehículo
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,7 +447,6 @@ class _MobilesScreenState extends State<MobilesScreen>
                 ],
               ),
             ),
-            // Íconos de estado
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -455,21 +454,18 @@ class _MobilesScreenState extends State<MobilesScreen>
                 _statusIcon('gps', isGpsActive),
                 _statusIcon('llave', isKeyActive),
                 GestureDetector(
-                    onTap: () {
-                      // Oculta el teclado y la lista para una transición limpia.
-                     // _searchFocusNode.unfocus();
-                      // Navega a la pantalla de seguridad, pasando la patente.
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SecurityActionsScreen(
-                            plate: vehicle.plate,
-                          ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SecurityActionsScreen(
+                          plate: vehicle.plate,
                         ),
-                      );
-                    },
-                    child: _statusIconShield('shield', isShieldActive),
-                  ),
+                      ),
+                    );
+                  },
+                  child: _statusIconShield('shield', isShieldActive),
+                ),
               ],
             ),
           ],
@@ -478,8 +474,7 @@ class _MobilesScreenState extends State<MobilesScreen>
     );
   }
 
-
- Widget _statusIconShield(String baseName, bool isActive) {
+  Widget _statusIconShield(String baseName, bool isActive) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10.0),
       child: Image.asset(
@@ -489,6 +484,7 @@ class _MobilesScreenState extends State<MobilesScreen>
       ),
     );
   }
+
   Widget _statusIcon(String baseName, bool isActive) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10.0),

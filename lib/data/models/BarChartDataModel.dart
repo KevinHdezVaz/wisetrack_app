@@ -1,4 +1,3 @@
-// archivo: chart_data_model.dart (o en el mismo archivo de la pantalla)
 import 'package:flutter/material.dart';
 
 class BarChartDataModel {

@@ -10,61 +10,51 @@ import GoogleMaps
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-
-    // 1. Inicializa Firebase. Esto SIEMPRE debe ser lo primero.
+    // Initialize Firebase
     FirebaseApp.configure()
 
-    // 2. Configura Google Maps con tu API Key
-    // Reemplaza "TU_API_KEY_DE_GOOGLE_MAPS" con tu clave real
+    // Configure Google Maps with your API Key
     GMSServices.provideAPIKey("AIzaSyAjWmOkK435ZzSYvaG_C1lSZU3ZIkjhLSE")
 
-    // 3. Registra los plugins de Flutter.
-    // Esto permite que plugins como Maps_flutter y firebase_messaging
-    // se configuren correctamente en el lado nativo.
+    // Register Flutter plugins
     GeneratedPluginRegistrant.register(with: self)
 
-    // 4. Configura el delegado para notificaciones de Firebase.
+    // Set Firebase Messaging delegate
     Messaging.messaging().delegate = self
     
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
-  // MARK: - Métodos para Notificaciones Push
+
+  // MARK: - Push Notification Methods
 
   override func application(_ application: UIApplication,
-                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-    // Convierte el token de Data a String para poder imprimirlo y depurar.
+                           didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
     let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
     let tokenString = tokenParts.joined()
-    // AÑADIDO: Prefijo "TOKEN_APNS:" para búsqueda fácil.
-    print("TOKEN_APNS: ✅ Token de dispositivo Apple (APNs) recibido: \(tokenString)")
+    print("TOKEN_APNS: ✅ Apple Device Token (APNs) received: \(tokenString)")
 
-    print("✅ Asignando token de APNs a Firebase Messaging...")
+    print("✅ Assigning APNs token to Firebase Messaging...")
     Messaging.messaging().apnsToken = deviceToken
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
 
   override func application(_ application: UIApplication, 
-                didFailToRegisterForRemoteNotificationsWithError error: Error) {
-    print("❌ Error al registrar para notificaciones remotas: \(error.localizedDescription)")
+                           didFailToRegisterForRemoteNotificationsWithError error: Error) {
+    print("❌ Failed to register for remote notifications: \(error.localizedDescription)")
   }
 }
 
 // MARK: - Firebase Messaging Delegate
 
 extension AppDelegate: MessagingDelegate {
-    // Este método se llama cuando Firebase genera o actualiza el token de FCM.
-    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        // AÑADIDO: Prefijo "TOKEN_FCM:" para búsqueda fácil.
-        print("TOKEN_FCM: 🔑 Token de registro de Firebase (FCM) recibido: \(String(describing: fcmToken))")
-        
-        // El plugin de Flutter se encarga de manejar este token.
-        // La línea que causaba el error fue eliminada.
-        // El NotificationCenter se mantiene por si lo usas en otra parte.
-        let dataDict: [String: String] = ["token": fcmToken ?? ""]
-        NotificationCenter.default.post(
-            name: Notification.Name("FCMToken"),
-            object: nil,
-            userInfo: dataDict
-        )
-    }
+  func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+    print("TOKEN_FCM: 🔑 Firebase (FCM) registration token received: \(String(describing: fcmToken))")
+    
+    let dataDict: [String: String] = ["token": fcmToken ?? ""]
+    NotificationCenter.default.post(
+      name: Notification.Name("FCMToken"),
+      object: nil,
+      userInfo: dataDict
+    )
+  }
 }

@@ -1,9 +1,6 @@
-// lib/data/models/vehicles/Vehicle.dart
+import 'package:flutter/material.dart';
 
-import 'dart:convert';
-import 'package:flutter/material.dart'; // Necesario para IconData
-
- class VehicleResponse {
+class VehicleResponse {
   final List<Vehicle> data;
 
   VehicleResponse({required this.data});
@@ -46,8 +43,6 @@ class VehicleType {
     );
   }
 }
- 
- 
 
 class Vehicle {
   final String plate;
@@ -82,29 +77,28 @@ class Vehicle {
 }
 
 enum VehicleTypeEnum {
-  lightVehicle, // 1: Coche pequeño, Liviano (asumido del PDF y JSON)
-  truck, // 2: Camión (asumido del JSON)
-  bus, // 163: Bus (asumido del JSON)
-  tracto, // Tracto (del PDF)
-  ramplaSeca, // Rampla Seca (del PDF)
-  ramplaFria, // Rampla Fría (del PDF)
-  camion3_4, // Camión 3/4 (del PDF)
-  camaBaja, // Cama Baja (del PDF)
-  cistern, // Cisterna (del PDF)
-  tolva, // Tolva (del PDF)
-  caex, // Caex (del PDF)
-  forklift, // Grúa Horquilla (del PDF)
-  crane, // Pluma, Grúa Vehicular (combinado por icono similar)
-  fireTruck, // Carro Bomba (del PDF)
-  van, // Furgón (del PDF)
-  excavator, // Retro-excavadora (del PDF)
-  loader, // Cargador Frontal (del PDF)
-  other, // Otro (del PDF) - para cualquier tipo no mapeado
-  unknown, // Fallback para tipos no reconocidos
+  lightVehicle,
+  truck,
+  bus,
+  tracto,
+  ramplaSeca,
+  ramplaFria,
+  camion3_4,
+  camaBaja,
+  cistern,
+  tolva,
+  caex,
+  forklift,
+  crane,
+  fireTruck,
+  van,
+  excavator,
+  loader,
+  other,
+  unknown,
 }
 
 extension VehicleTypeIntExtension on int {
-  // Renombrado para mayor claridad
   VehicleTypeEnum toVehicleTypeEnum() {
     switch (this) {
       case 1:
@@ -113,31 +107,13 @@ extension VehicleTypeIntExtension on int {
         return VehicleTypeEnum.truck;
       case 163:
         return VehicleTypeEnum.bus;
-      // --- Añade aquí el mapeo para otros 'vehicle_type' que recibas de tu API ---
-      // Ejemplo (necesitarás los IDs reales de tu backend):
-      // case 3: return VehicleTypeEnum.tracto;
-      // case 4: return VehicleTypeEnum.ramplaSeca;
-      // case 5: return VehicleTypeEnum.ramplaFria;
-      // case 6: return VehicleTypeEnum.camion3_4;
-      // case 7: return VehicleTypeEnum.camaBaja;
-      // case 8: return VehicleTypeEnum.cistern;
-      // case 9: return VehicleTypeEnum.tolva;
-      // case 10: return VehicleTypeEnum.caex;
-      // case 11: return VehicleTypeEnum.forklift;
-      // case 12: return VehicleTypeEnum.crane;
-      // case 13: return VehicleTypeEnum.fireTruck;
-      // case 14: return VehicleTypeEnum.van;
-      // case 15: return VehicleTypeEnum.excavator;
-      // case 16: return VehicleTypeEnum.loader;
-      // case 17: return VehicleTypeEnum.other;
-
       default:
-        return VehicleTypeEnum.unknown; // Tipo desconocido
+        return VehicleTypeEnum.unknown;
     }
   }
 }
 
- extension VehicleTypeEnumExtension on VehicleTypeEnum {
+extension VehicleTypeEnumExtension on VehicleTypeEnum {
   IconData get iconData {
     switch (this) {
       case VehicleTypeEnum.lightVehicle:
@@ -182,7 +158,6 @@ extension VehicleTypeIntExtension on int {
     }
   }
 
-  // Opcional: Getter para obtener un IconData de Material si prefieres eso
   IconData get defaultIconData {
     switch (this) {
       case VehicleTypeEnum.lightVehicle:
@@ -194,9 +169,9 @@ extension VehicleTypeIntExtension on int {
       case VehicleTypeEnum.cistern:
         return Icons.opacity;
       case VehicleTypeEnum.forklift:
-        return Icons.agriculture; // Usando un icono de maquinaria pesada
+        return Icons.agriculture;
       case VehicleTypeEnum.crane:
-        return Icons.construction; // Icono de construcción
+        return Icons.construction;
       case VehicleTypeEnum.fireTruck:
         return Icons.fire_truck;
       case VehicleTypeEnum.van:
@@ -211,7 +186,6 @@ extension VehicleTypeIntExtension on int {
   }
 }
 
-// Modelos para posición e historial, se mantienen sin cambios
 class VehiclePosition {
   final String plate;
   final double lat;

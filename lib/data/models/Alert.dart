@@ -25,8 +25,6 @@ class Alert {
       read: json['read'] ?? false,
     );
   }
-
-  // Para debug
   @override
   String toString() {
     return 'Alert[$type]: $message (${timestamp.toLocal()})';

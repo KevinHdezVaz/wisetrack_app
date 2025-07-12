@@ -1,5 +1,3 @@
-// archivo: notification_model.dart (o en el mismo archivo de la pantalla)
-
 class NotificationItem {
   final String title;
   final String description;

@@ -1,14 +1,54 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:wisetrack_app/data/models/alert/AlertModel.dart';
-import 'package:wisetrack_app/ui/color/app_colors.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:wisetrack_app/data/models/NotificationItem.dart' as model;
+ 
+ import 'package:wisetrack_app/data/services/NotificationsService.dart';
+ import 'package:wisetrack_app/ui/color/app_colors.dart';
 
-class NotificationDetailScreen extends StatelessWidget {
-  final Alertas alert;
+class NotificationDetailScreen extends StatefulWidget {
+  final int notificationId;
 
-  const NotificationDetailScreen({Key? key, required this.alert})
+  const NotificationDetailScreen({Key? key, required this.notificationId})
       : super(key: key);
+
+  @override
+  _NotificationDetailScreenState createState() =>
+      _NotificationDetailScreenState();
+}
+
+class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
+  bool _isLoading = true;
+  String? _errorMessage;
+  model.NotificationDetail? _notificationDetail;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchNotificationDetails();
+  }
+
+  Future<void> _fetchNotificationDetails() async {
+    try {
+      final detail = await NotificationService.getNotificationDetail(
+          notificationId: widget.notificationId);
+      if (mounted) {
+        setState(() {
+          _notificationDetail = detail;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = "Error al cargar el detalle de la notificación.";
+          _isLoading = false;
+        });
+        debugPrint("Error fetching details: $e");
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,26 +62,46 @@ class NotificationDetailScreen extends StatelessWidget {
             style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      body: Stack(
-        children: [
-          ListView(
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
+    if (_errorMessage != null) {
+      return Center(
+          child: Padding(
             padding: const EdgeInsets.all(16.0),
-            children: [
-              _buildNotificationHeader(alert),
-              const SizedBox(height: 16),
-              const SizedBox(height: 16),
-              if (alert.latitude != null && alert.longitude != null)
-                _buildMapView(alert)
-              else
-                _buildNoLocationView(),
-              const SizedBox(height: 40),
-              _buildDetailsSection(alert),
-              const SizedBox(height: 100),
-            ],
-          ),
-          _buildShareButton(),
-        ],
-      ),
+            child: Text(_errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red)),
+          ));
+    }
+    if (_notificationDetail == null) {
+      return const Center(child: Text('No se encontraron detalles para la notificación.'));
+    }
+
+    final detail = _notificationDetail!;
+    return Stack(
+      children: [
+        ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            _buildNotificationHeader(detail),
+            const SizedBox(height: 24),
+            if (detail.alert.latitude != null && detail.alert.longitude != null)
+              _buildMapView(detail)
+            else
+              _buildNoLocationView(),
+            const SizedBox(height: 40),
+            _buildDetailsSection(detail),
+            const SizedBox(height: 100), // Espacio para el botón flotante
+          ],
+        ),
+        _buildShareButton(),
+      ],
     );
   }
 
@@ -51,75 +111,59 @@ class NotificationDetailScreen extends StatelessWidget {
       onPressed: () => Navigator.of(context).pop(),
     );
   }
-
-  Widget _buildNotificationHeader(Alertas alert) {
+  
+  Widget _buildNotificationHeader(model.NotificationDetail detail) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Text(
-                alert.name,
+                detail.messageTitle,
                 style:
                     const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
             ),
+            const SizedBox(width: 8),
             Text(
-              alert.alertDate != null
-                  ? DateFormat('HH:mm a').format(alert.alertDate!)
-                  : '',
+              DateFormat('HH:mm a').format(detail.date),
               style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
           ],
         ),
         const SizedBox(height: 8),
-        RichText(
-          text: TextSpan(
-            style: TextStyle(
-                fontSize: 16, color: Colors.grey.shade800, height: 1.4),
-            children: [
-              const TextSpan(text: 'El vehículo '),
-              TextSpan(
-                text: alert.plate,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              TextSpan(text: ' generó la alerta.'),
-            ],
-          ),
+        Text(
+          detail.messageBody,
+          style: TextStyle(fontSize: 16, color: Colors.grey.shade800, height: 1.4),
         ),
       ],
     );
   }
 
-  Widget _buildMapView(Alertas alert) {
-    final location = LatLng(alert.latitude!, alert.longitude!);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SizedBox(
-          height: 250,
-          width: constraints.maxWidth, // Usa el ancho máximo disponible
-          child: ClipRRect(
-            child: GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: location,
-                zoom: 15.0,
-              ),
-              markers: {
-                Marker(
-                  markerId: MarkerId(alert.plate),
-                  position: location,
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                      BitmapDescriptor.hueRed),
-                ),
-              },
-              zoomControlsEnabled: false,
-            ),
+  Widget _buildMapView(model.NotificationDetail detail) {
+    final location = LatLng(detail.alert.latitude!, detail.alert.longitude!);
+    return SizedBox(
+      height: 250,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15.0),
+        child: GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: location,
+            zoom: 15.0,
           ),
-        );
-      },
+          markers: {
+            Marker(
+              markerId: MarkerId(detail.id.toString()),
+              position: location,
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+            ),
+          },
+          zoomControlsEnabled: false,
+        ),
+      ),
     );
   }
 
@@ -143,7 +187,7 @@ class NotificationDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailsSection(Alertas alert) {
+  Widget _buildDetailsSection(model.NotificationDetail detail) {
     return Column(
       children: [
         _buildDetailRow(
@@ -152,20 +196,13 @@ class NotificationDetailScreen extends StatelessWidget {
               backgroundColor: Colors.grey,
               child: Icon(Icons.person, size: 18, color: Colors.white)),
           label: 'Conductor:',
-          value: alert.driverName,
+          value: detail.alert.driver,
         ),
-        const SizedBox(height: 16),
-        _buildDetailRow(
-          icon:
-              const Icon(Icons.location_on, color: AppColors.primary, size: 30),
-          label: 'Geocerca:',
-          value: alert.geofenceName ??
-              'No aplica', // Muestra 'No aplica' si es nulo
-        ),
+        // La geocerca no está disponible en este endpoint, se omite.
       ],
     );
   }
-
+  
   Widget _buildDetailRow(
       {required Widget icon, required String label, required String value}) {
     return Row(
@@ -188,26 +225,66 @@ class NotificationDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildShareButton() {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.share, color: Colors.white),
-          label: const Text('Compartir',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0)),
+ Widget _buildShareButton() {
+  return Align(
+    alignment: Alignment.bottomCenter,
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      // El color de fondo es transparente para no ocultar el contenido de la lista al hacer scroll.
+      // Se usa un gradiente sutil para que el botón se destaque sobre el contenido.
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            Colors.white,
+            Colors.white.withOpacity(0.0),
+          ],
+          stops: const [0.5, 1.0],
+        ),
+      ),
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          // Asegúrate de que los detalles de la notificación no sean nulos
+          if (_notificationDetail != null) {
+            final detail = _notificationDetail!;
+            
+            // 1. Construye el mensaje de texto a compartir
+            final dateString = DateFormat('dd/MM/yyyy HH:mm a').format(detail.date);
+            
+            String shareText = "🔔 *Alerta WiseTrack*\n\n"
+                "*${detail.messageTitle}*\n"
+                "${detail.messageBody}\n\n"
+                "👤 *Conductor:* ${detail.alert.driver}\n"
+                "📅 *Fecha:* $dateString";
+
+            // 2. Agrega el enlace de Google Maps si hay coordenadas
+            if (detail.alert.latitude != null && detail.alert.longitude != null) {
+              final lat = detail.alert.latitude;
+              final lon = detail.alert.longitude;
+              final googleMapsUrl = "https://www.google.com/maps/search/?api=1&query=$lat,$lon";
+              shareText += "\n\n📍 *Ubicación:*\n$googleMapsUrl";
+            }
+
+            // 3. Usa el paquete para mostrar el diálogo de compartir
+            Share.share(shareText);
+          }
+        },
+        icon: const Icon(Icons.share, color: Colors.white),
+        label: const Text(
+          'Compartir',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.0),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

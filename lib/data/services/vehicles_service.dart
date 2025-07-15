@@ -49,33 +49,29 @@ class VehicleService {
     }
   }
 
-  static Future<VehicleAccessories> getVehicleAccessories(String plate) async {
-    final url =
-        Uri.parse('${Constants.baseUrl}/vehicle/get-accessories/$plate');
-    debugPrint(
-        'VehicleService: Realizando GET a: $url para accesorios de placa: $plate');
+ // data/services/vehicles_service.dart (relevant method)
+static Future<VehicleAccessories> getVehicleAccessories(String plate) async {
+  final url = Uri.parse('${Constants.baseUrl}/vehicle/get-accessories/$plate');
+  debugPrint('VehicleService: Realizando GET a: $url para accesorios de placa: $plate');
 
-    try {
-      final response = await http.get(
-        url,
-        headers: await _getAuthHeaders(),
-      );
+  try {
+    final response = await http.get(
+      url,
+      headers: await _getAuthHeaders(),
+    );
 
-      debugPrint(
-          'VehicleService: Respuesta GET ${response.statusCode}: ${response.body}');
+    debugPrint('VehicleService: Respuesta GET ${response.statusCode}: ${response.body}');
 
-      if (response.statusCode == 200) {
-        return VehicleAccessories.fromJson(jsonDecode(response.body));
-      } else {
-        throw Exception(
-            'Failed to load vehicle accessories: ${response.statusCode} - ${response.body}');
-      }
-    } catch (e) {
-      debugPrint(
-          'VehicleService: Error en getVehicleAccessories para $plate: $e');
-      throw Exception('Vehicle accessories request failed: $e');
+    if (response.statusCode == 200) {
+      return VehicleAccessories.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load vehicle accessories: ${response.statusCode} - ${response.body}');
     }
+  } catch (e) {
+    debugPrint('VehicleService: Error en getVehicleAccessories para $plate: $e');
+    throw Exception('Vehicle accessories request failed: $e');
   }
+}
 
   static Future<VehicleDetail> getVehicleDetail(String plate) async {
     final url = Uri.parse('${Constants.baseUrl}/vehicle/get/$plate');

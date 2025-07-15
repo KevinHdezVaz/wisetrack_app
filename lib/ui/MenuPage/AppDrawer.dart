@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:wisetrack_app/data/services/UserCacheService.dart';
 import 'package:wisetrack_app/data/services/notification_service.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
+import 'package:wisetrack_app/utils/NotificationCountService.dart';
 
 import '../../data/models/User/UserDetail.dart';
 
@@ -60,12 +61,23 @@ class AppDrawer extends StatelessWidget {
                     title: 'Auditorías',
                     routeName: '/auditoria',
                   ),
-                  _buildDrawerItem(
+               _buildDrawerItem(
                     context: context,
                     icon: Icons.notifications,
                     title: 'Notificaciones',
                     routeName: '/notifications',
-                    trailing: _buildNotificationBadge('3'),
+                    // Envuelve el badge en un ValueListenableBuilder
+                    trailing: ValueListenableBuilder<int>(
+                      valueListenable: NotificationCountService.unreadCountNotifier,
+                      builder: (context, unreadCount, child) {
+                        // Si no hay notificaciones no leídas, no muestra nada.
+                        if (unreadCount == 0) {
+                          return const SizedBox.shrink(); 
+                        }
+                        // Si hay, muestra el badge con el conteo actualizado.
+                        return _buildNotificationBadge(unreadCount.toString());
+                      },
+                    ),
                   ),
                   _buildDrawerItem(
                     context: context,
@@ -131,20 +143,7 @@ class AppDrawer extends StatelessWidget {
                       );
                     },
                   ),
-                  ValueListenableBuilder<String?>(
-                    valueListenable:
-                        NotificationServiceFirebase.apnsTokenNotifier,
-                    builder: (context, token, child) {
-                      if (!Platform.isIOS) return const SizedBox.shrink();
-                      return _buildTokenTile(
-                        context: context,
-                        title: 'APNs Token (Apple)',
-                        token: token,
-                        icon: Icons.apple,
-                        color: Colors.black87,
-                      );
-                    },
-                  ),
+                
                 ],
               ),
             ),

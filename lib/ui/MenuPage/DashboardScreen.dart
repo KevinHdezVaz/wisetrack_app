@@ -24,6 +24,7 @@ import 'package:wisetrack_app/ui/MenuPage/moviles/VehicleDetailScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/profile/EditProfileScreen.dart';
 import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
+import 'package:wisetrack_app/utils/NotificationCountService.dart';
 import 'package:wisetrack_app/utils/TokenStorage.dart';
 import 'dart:ui' as ui;
 import 'dart:math' show pi;
@@ -70,15 +71,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void initState() {
     super.initState();
-
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 7),
     );
-
     _searchFocusNode.addListener(_onSearchFocusChange);
     _searchController.addListener(_filterVehicles);
-
     _initializeApp();
   }
 
@@ -90,21 +88,99 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.dispose();
   }
 
-  Future<void> _initializeApp() async {
+ Future<void> _initializeApp() async {
     setState(() => _isLoading = true);
     _animationController.repeat();
 
-    await _centerOnUserLocation();
-    await _initializeDashboardData();
+    try {
+      // 1. Ejecutamos todas las llamadas de red y de permisos en PARALELO.
+      final results = await Future.wait([
+        VehicleService.getAllVehicles(),             // Índice 0
+        VehiclePositionService.getVehiclesPositions(),// Índice 1
+        VehicleService.getVehicleTypes(),           // Índice 2
+        UserService.getUserDetail(),                // Índice 3
+        NotificationCountService.updateCount(),     // Índice 4 (No devuelve nada importante)
+        _getInitialUserPosition(),                  // Índice 5 (Nueva función auxiliar)
+      ]);
 
-    final notificationService = NotificationServiceFirebase();
-    await notificationService.initAndSendDeviceData();
+      // 2. Una vez que TODO ha llegado, procesamos los resultados.
+      final List<Vehicle> vehicles = results[0] as List<Vehicle>;
+      final VehiclePositionResponse positionResponse = results[1] as VehiclePositionResponse;
+      final List<VehicleType> types = results[2] as List<VehicleType>;
+      final UserDetailResponse userResponse = results[3] as UserDetailResponse;
+      final Position? userPosition = results[5] as Position?;
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      _animationController.stop();
+      // 3. Preparamos los datos para el estado.
+      final Map<int, String> typesMap = {for (var type in types) type.id: type.name};
+      
+      if (userPosition != null && mounted) {
+        _initialCameraPosition = CameraPosition(
+          target: LatLng(userPosition.latitude, userPosition.longitude),
+          zoom: 8.0,
+        );
+      }
+      
+      // 4. Actualizamos el estado de la UI una sola vez con los datos principales.
+      // Esto hace que el mapa y la UI aparezcan más rápido.
+      if (mounted) {
+        setState(() {
+          _allVehicles = vehicles;
+          _vehicleTypeMap = typesMap;
+          _filteredVehicles = List.from(_allVehicles);
+          _currentUser = userResponse.data;
+          _isLoading = false; // <-- Mostramos la UI principal aquí
+        });
+        _animationController.stop();
+      }
+
+      // 5. Configuramos los marcadores de forma asíncrona.
+      // El usuario ya ve el mapa mientras los marcadores se preparan.
+      await _setupMarkers(positionResponse.data);
+      
+      // 6. Enviamos datos del dispositivo (esto puede ser al final y sin esperar).
+      final notificationService = NotificationServiceFirebase();
+      notificationService.initAndSendDeviceData();
+
+    } catch (e) {
+      print('Error al inicializar datos del dashboard: $e');
+      if (e.toString().contains('401')) {
+        if (mounted) await _handleInvalidToken();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No se pudieron cargar los datos: $e')),
+          );
+          setState(() => _isLoading = false); // Detener carga en otros errores
+        }
+      }
     }
   }
+
+    // Separa la lógica de permisos y obtención de la ubicación para usarla en Future.wait
+  Future<Position?> _getInitialUserPosition() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
+          return null;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) return null;
+
+      return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    } catch (e) {
+      print("No se pudo obtener la ubicación inicial: $e");
+      return null;
+    }
+  }
+
+    
+  
+
 
   Widget _statusIconShield(String baseName, bool isActive) {
     return Padding(
@@ -522,6 +598,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   zoomControlsEnabled: false,
                   onTap: (_) => _searchFocusNode.unfocus(),
                 ),
+                
               if (!_isLoading) _buildTopSearchBar(),
               if (!_isLoading) _buildFloatingActionButtons(),
               if (_isLoading || _isLoggingOut)
@@ -543,81 +620,121 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildTopSearchBar() {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Builder(builder: (context) {
-                  return Container(
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                              blurRadius: 5,
-                              color: Colors.black.withOpacity(0.2))
-                        ]),
-                    child: IconButton(
-                        icon: const Icon(Icons.menu, color: Colors.black54),
-                        onPressed: () => Scaffold.of(context).openDrawer()),
-                  );
-                }),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                              blurRadius: 5,
-                              color: Colors.black.withOpacity(0.2))
-                        ]),
-                    child: TextField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode,
-                      textAlignVertical: TextAlignVertical.center,
-                      decoration: InputDecoration(
-                        hintText: 'Buscar un móvil',
-                        border: InputBorder.none,
-                        prefixIcon:
-                            const Icon(Icons.search, color: Colors.grey),
-                        suffixIcon: GestureDetector(
-                          onTap: () {
-                            _openFilterBottomSheet();
-                          },
-                          child: Container(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 12.0),
-                            child: Transform.scale(
-                                scale: 0.7,
-                                child: ImageIcon(
-                                    const AssetImage(
-                                        'assets/images/icon_filter.png'),
-                                    color: AppColors.primary)),
-                          ),
+  // En DashboardScreen.dart
+
+Widget _buildTopSearchBar() {
+  return SafeArea(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Builder(builder: (context) {
+                return ValueListenableBuilder<int>(
+                  valueListenable: NotificationCountService.unreadCountNotifier,
+                  builder: (context, unreadCount, child) {
+                    final bool hasNotifications = unreadCount > 0;
+                    
+                    // Define el color del fondo y del ícono dinámicamente
+                    final Color backgroundColor = hasNotifications ? AppColors.primary : Colors.white;  
+                    final Color iconColor = hasNotifications ? Colors.white : Colors.black54;  
+
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Botón del menú con color dinámico
+                        Container(
+                          decoration: BoxDecoration(
+                              color: backgroundColor, // <-- Se usa el color dinámico
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                    blurRadius: 5,
+                                    color: Colors.black.withOpacity(0.2))
+                              ]),
+                          child: IconButton(
+                              icon: Icon(Icons.menu, color: iconColor), 
+                              onPressed: () => Scaffold.of(context).openDrawer()),
                         ),
-                        contentPadding: const EdgeInsets.only(left: 20),
-                        isDense: true,
+                        // Badge (se mantiene igual)
+                        if (hasNotifications)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                unreadCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                );
+              }),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                            blurRadius: 5,
+                            color: Colors.black.withOpacity(0.2))
+                      ]),
+                  child: TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    textAlignVertical: TextAlignVertical.center,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar un móvil',
+                      border: InputBorder.none,
+                      prefixIcon:
+                          const Icon(Icons.search, color: Colors.grey),
+                      suffixIcon: GestureDetector(
+                        onTap: () {
+                          _openFilterBottomSheet();
+                        },
+                        child: Container(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 12.0),
+                          child: Transform.scale(
+                              scale: 0.7,
+                              child: ImageIcon(
+                                  const AssetImage(
+                                      'assets/images/icon_filter.png'),
+                                  color: AppColors.primary)),
+                        ),
                       ),
+                      contentPadding: const EdgeInsets.only(left: 20),
+                      isDense: true,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                _buildDriverInfo(),
-              ],
-            ),
-            _buildSearchResultsList(),
-          ],
-        ),
+              ),
+              const SizedBox(width: 10),
+              _buildDriverInfo(),
+            ],
+          ),
+          _buildSearchResultsList(),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Future<void> _centerOnUserLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();

@@ -16,6 +16,7 @@ import 'package:wisetrack_app/ui/SplashScreen.dart';
 import 'package:wisetrack_app/ui/login/LoginScreen.dart';
 import 'package:wisetrack_app/ui/profile/SettingsScreen.dart';
 import 'package:wisetrack_app/utils/AuthWrapper.dart';
+import 'package:wisetrack_app/utils/NotificationCountService.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -40,6 +41,9 @@ void main() async {
     print('❌ Error crítico inicializando Firebase: $e');
     print('Stack trace: $stack');
   }
+
+    NotificationCountService.updateCount(); // <-- Carga el conteo inicial
+
 
   HttpOverrides.global = MyHttpOverrides();
   initializeDateFormatting('es_ES', null).then((_) {

@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:intl/intl.dart';
 
+// Response wrapper for notifications (not used directly by new API, but kept for potential future use)
 class AlertsResponse {
   final List<Alertas> data;
 
@@ -16,19 +18,22 @@ class AlertsResponse {
 }
 
 class Alertas {
+  final String id; // Added to match API's id field
   final String name;
   final String plate;
   final DateTime? alertDate;
-  final double? speed;
-  final double? latitude;
-  final double? longitude;
+  final double? speed; // Not provided by API, kept as nullable
+  final double? latitude; // Provided in get-notification-detail
+  final double? longitude; // Provided in get-notification-detail
   final String driverName;
-  final String? geofenceName;
-  final int status;
+  final String? geofenceName; // Not provided by API, kept as nullable
+  final int status; // Not provided by API, default to 0
   final AlertType alertType;
   final AlertVehicle vehicle;
+  final bool read; // Added to track read status from get-notification-detail
 
   Alertas({
+    required this.id,
     required this.name,
     required this.plate,
     this.alertDate,
@@ -40,6 +45,7 @@ class Alertas {
     required this.status,
     required this.alertType,
     required this.vehicle,
+    required this.read,
   });
 
   factory Alertas.fromJson(Map<String, dynamic> json) {
@@ -50,25 +56,55 @@ class Alertas {
     }
 
     DateTime? safeParseDateTime(dynamic value) {
-      if (value is String) return DateTime.tryParse(value);
+      if (value is String) {
+        try {
+          return DateFormat('yyyy-MM-dd HH:mm:ss').parse(value);
+        } catch (e) {
+          return null;
+        }
+      }
       return null;
     }
 
+    // Extract plate from body if present (e.g., "El Vehiculo RKWV - 10, ...")
+    final body = json['body'] as String? ?? json['message_body'] as String? ?? '';
+    final plateMatch = RegExp(r'El Vehiculo (\w+ - \d+)').firstMatch(body);
+    final plate = plateMatch != null ? plateMatch.group(1) ?? 'Unknown' : 'Unknown';
+
     return Alertas(
-      name: json['name'] as String? ?? 'Alerta desconocida',
-      plate: json['plate'] as String? ?? '',
-      alertDate: safeParseDateTime(json['alert_date']),
-      speed: (json['speed'] as num?)?.toDouble(),
+      id: (json['id'] as int?)?.toString() ?? '0',
+      name: json['name'] as String? ?? json['type'] as String? ?? json['message_title'] as String? ?? 'Alerta desconocida',
+      plate: plate,
+      alertDate: safeParseDateTime(json['date']) ?? _parseHour(json['hour']),
+      speed: safeParseDouble(json['speed']), // Not provided by API
       latitude: safeParseDouble(json['latitude']),
       longitude: safeParseDouble(json['longitude']),
-      driverName: json['driver_name'] as String? ?? 'Sin conductor',
-      geofenceName: json['geofence_name'] as String?,
-      status: json['status'] as int? ?? 0,
-      alertType:
-          AlertType.fromJson(json['alert_type'] as Map<String, dynamic>? ?? {}),
-      vehicle:
-          AlertVehicle.fromJson(json['vehicle'] as Map<String, dynamic>? ?? {}),
+      driverName: json['driver_name'] as String? ?? json['driver'] as String? ?? 'Sin conductor',
+      geofenceName: json['geofence_name'] as String?, // Not provided by API
+      status: json['status'] as int? ?? 0, // Default to 0
+      alertType: AlertType.fromJson(
+        json['alert_type'] as Map<String, dynamic>? ??
+            {
+              'id': json['id'] ?? 0,
+              'name': json['type'] ?? json['message_title'] ?? 'Unknown',
+            },
+      ),
+      vehicle: AlertVehicle.fromJson(
+        json['vehicle'] as Map<String, dynamic>? ?? {'plate': plate},
+      ),
+      read: json['read'] as bool? ?? false,
     );
+  }
+
+  static DateTime? _parseHour(String? hour) {
+    if (hour == null) return null;
+    try {
+      final now = DateTime.now();
+      final time = DateFormat('HH:mm:ss').parse(hour);
+      return DateTime(now.year, now.month, now.day, time.hour, time.minute, time.second);
+    } catch (e) {
+      return null;
+    }
   }
 }
 

@@ -6,6 +6,7 @@ import 'package:wisetrack_app/data/services/NotificationsService.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:wisetrack_app/ui/profile/EditProfileScreen.dart';
 import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
+import 'package:wisetrack_app/utils/NotificationCountService.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -117,6 +118,9 @@ class _SettingsScreenState extends State<SettingsScreen>
           name: 'conduccion 10 Horas', value: _tenHoursDrivingAlerts);
       await NotificationService.updateSingleNotificationPermission(
           name: 'conduccion continua', value: _continuousDrivingAlerts);
+
+      await NotificationCountService.updateCount();
+
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

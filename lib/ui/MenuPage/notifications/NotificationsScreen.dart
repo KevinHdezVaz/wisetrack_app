@@ -148,6 +148,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       ReadStatusManager.markNotificationAsRead(notification.id);
             NotificationCountService.decrementCount(); // <-- ¡AQUÍ! Decrementa el contador
 
+
+//buenas 
     }
 
     Navigator.push(

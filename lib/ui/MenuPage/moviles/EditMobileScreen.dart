@@ -4,6 +4,7 @@ import 'package:wisetrack_app/data/models/vehicles/Vehicle.dart';
 import 'package:wisetrack_app/data/services/vehicles_service.dart';
 import 'package:wisetrack_app/ui/MenuPage/moviles/SuccessDialog.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class EditMobileScreen extends StatefulWidget {
   final String plate;
@@ -14,27 +15,41 @@ class EditMobileScreen extends StatefulWidget {
   _EditMobileScreenState createState() => _EditMobileScreenState();
 }
 
-class _EditMobileScreenState extends State<EditMobileScreen> {
+class _EditMobileScreenState extends State<EditMobileScreen>
+    with SingleTickerProviderStateMixin {
   bool _isLoading = true;
   bool _isSaving = false;
   String? _errorMessage;
   List<VehicleType> _vehicleTypes = [];
   int? _selectedVehicleTypeId;
+  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3), // Duración de la animación
+    );
     _fetchVehicleTypes();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchVehicleTypes() async {
     try {
+      _animationController.repeat(); // Inicia la animación
       final types = await VehicleService.getVehicleTypes();
       if (mounted) {
         setState(() {
           _vehicleTypes = types;
           _isLoading = false;
         });
+        _animationController.stop(); // Detiene la animación
       }
     } catch (e) {
       if (mounted) {
@@ -42,6 +57,7 @@ class _EditMobileScreenState extends State<EditMobileScreen> {
           _errorMessage = "Error al cargar tipos: ${e.toString()}";
           _isLoading = false;
         });
+        _animationController.stop(); // Detiene la animación en caso de error
       }
     }
   }
@@ -52,6 +68,7 @@ class _EditMobileScreenState extends State<EditMobileScreen> {
     setState(() {
       _isSaving = true;
     });
+    _animationController.repeat(); // Inicia la animación al guardar
 
     try {
       final success = await VehicleService.setVehicleType(
@@ -60,6 +77,7 @@ class _EditMobileScreenState extends State<EditMobileScreen> {
       );
 
       if (mounted) {
+        _animationController.stop(); // Detiene la animación
         if (success) {
           showDialog(
             context: context,
@@ -73,6 +91,7 @@ class _EditMobileScreenState extends State<EditMobileScreen> {
       }
     } catch (e) {
       if (mounted) {
+        _animationController.stop(); // Detiene la animación en caso de error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al guardar: ${e.toString()}')),
         );
@@ -82,10 +101,11 @@ class _EditMobileScreenState extends State<EditMobileScreen> {
         setState(() {
           _isSaving = false;
         });
+        _animationController.reset(); // Resetea la animación
       }
     }
   }
-  
+
   String? get _selectedVehicleName {
     if (_selectedVehicleTypeId == null) return null;
     try {
@@ -108,24 +128,38 @@ class _EditMobileScreenState extends State<EditMobileScreen> {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildBodyContent(),
-            const Spacer(),
-            _buildSaveChangesButton(),
-          ],
-        ),
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                _buildBodyContent(),
+                const Spacer(),
+                _buildSaveChangesButton(),
+              ],
+            ),
+          ),
+          if (_isSaving)
+            Center(
+              child: AnimatedTruckProgress(
+                animation: _animationController,
+              ),
+            ),
+        ],
       ),
     );
   }
 
   Widget _buildBodyContent() {
     if (_isLoading) {
-      return const SizedBox(
+      return SizedBox(
         height: 100,
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(
+          child: AnimatedTruckProgress(
+            animation: _animationController,
+          ),
+        ),
       );
     }
 
@@ -141,7 +175,7 @@ class _EditMobileScreenState extends State<EditMobileScreen> {
         ),
       );
     }
-    
+
     return _buildCustomDropdown();
   }
 
@@ -209,7 +243,7 @@ class _EditMobileScreenState extends State<EditMobileScreen> {
         dropdownStyleData: DropdownStyleData(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            color: Colors.white, // Fondo blanco
+            color: Colors.white,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.1),
@@ -252,20 +286,11 @@ class _EditMobileScreenState extends State<EditMobileScreen> {
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12.0)),
           ),
-          child: _isSaving
-              ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 3,
-                  ),
-                )
-              : const Text(
-                  'Guardar cambios',
-                  style: TextStyle(
-                      color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+          child: const Text(
+            'Guardar cambios',
+            style: TextStyle(
+                color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
         ),
       ),
     );

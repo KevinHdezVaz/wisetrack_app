@@ -4,10 +4,12 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:wisetrack_app/data/models/User/UserDetail.dart';
+import 'package:wisetrack_app/data/services/UserCacheService.dart';
 import 'package:wisetrack_app/data/services/UserService.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:wisetrack_app/utils/AnimatedTruckProgress.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
@@ -16,14 +18,17 @@ class EditProfileScreen extends StatefulWidget {
   _EditProfileScreenState createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
+class _EditProfileScreenState extends State<EditProfileScreen>
+    with SingleTickerProviderStateMixin {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _companyController;
   File? _selectedImage;
   bool _isLoading = true;
+  bool _isSaving = false; // Added to track saving state
   String? _errorMessage;
   UserDetailResponse? _userDetail;
+  late AnimationController _animationController;
 
   @override
   void initState() {
@@ -31,6 +36,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController = TextEditingController();
     _emailController = TextEditingController();
     _companyController = TextEditingController();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3), // Animation duration
+    );
     _loadUserData();
   }
 
@@ -39,11 +48,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _companyController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
   Future<void> _loadUserData() async {
     try {
+      _animationController.repeat(); // Start animation
       final userDetail = await UserService.getUserDetail();
       if (mounted) {
         setState(() {
@@ -53,6 +64,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _companyController.text = userDetail.data.company.name;
           _isLoading = false;
         });
+        _animationController.stop(); // Stop animation
       }
     } catch (e) {
       if (mounted) {
@@ -60,6 +72,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _errorMessage = "Error al cargar datos: ${e.toString()}";
           _isLoading = false;
         });
+        _animationController.stop(); // Stop animation on error
       }
     }
   }
@@ -67,8 +80,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _showImagePickerOptions() async {
     showModalBottomSheet(
       context: context,
-      backgroundColor:
-          Colors.transparent, // Importante para que funcionen los bordes
+      backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return Container(
           decoration: const BoxDecoration(
@@ -112,31 +124,46 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? pickedFile = await picker.pickImage(source: source);
+  // En EditProfileScreen
 
-    if (pickedFile == null) return; // Si el usuario no elige nada, salimos.
-    final originalFile = File(pickedFile.path);
-    final tempDir = await getTemporaryDirectory();
-    final targetPath = p.join(tempDir.path, "temp_profile.jpg");
-    final XFile? compressedFile = await FlutterImageCompress.compressAndGetFile(
-      originalFile.absolute.path,
-      targetPath,
-      quality: 60, // Calidad de 0 a 100. Un valor entre 50-70 es ideal.
-    );
-
-    if (compressedFile != null && mounted) {
-      setState(() {
-        _selectedImage = File(compressedFile.path);
-      });
-      print(
-          'Tamaño original: ${(originalFile.lengthSync() / 1024 / 1024).toStringAsFixed(2)} MB');
-      print(
-          'Tamaño comprimido: ${(_selectedImage!.lengthSync() / 1024).toStringAsFixed(2)} KB');
+Future<void> _pickImage(ImageSource source) async {
+  // --- 1. VERIFICAR PERMISOS PRIMERO ---
+  final hasPermission = await _checkPermissions(source);
+  if (!hasPermission) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Permiso denegado. Habilítalo en la configuración de tu teléfono.')),
+      );
     }
+    return; // Detiene la ejecución si no hay permiso
   }
 
+  // --- 2. EL RESTO DE TU CÓDIGO ---
+  final ImagePicker picker = ImagePicker();
+  final XFile? pickedFile = await picker.pickImage(source: source);
+
+  if (pickedFile == null) return;
+  
+  final originalFile = File(pickedFile.path);
+  final tempDir = await getTemporaryDirectory();
+  final targetPath = p.join(tempDir.path, "temp_profile.jpg");
+  
+  final XFile? compressedFile = await FlutterImageCompress.compressAndGetFile(
+    originalFile.absolute.path,
+    targetPath,
+    quality: 60,
+  );
+
+  if (compressedFile != null && mounted) {
+    setState(() {
+      _selectedImage = File(compressedFile.path);
+    });
+    print(
+        'Tamaño original: ${(originalFile.lengthSync() / 1024 / 1024).toStringAsFixed(2)} MB');
+    print(
+        'Tamaño comprimido: ${(_selectedImage!.lengthSync() / 1024).toStringAsFixed(2)} KB');
+  }
+}
   Future<bool> _checkPermissions(ImageSource source) async {
     if (Platform.isIOS) {
       final status = await Permission.photos.status;
@@ -146,7 +173,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return await Permission.photos.request().isGranted;
       }
     }
-    return true; // En Android no es necesario en la mayoría de casos
+    return true;
   }
 
   Future<void> _saveChanges() async {
@@ -157,11 +184,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
+    setState(() {
+      _isSaving = true;
+    });
+    _animationController.repeat(); // Start animation
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+      builder: (dialogContext) => Center(
+        child: AnimatedTruckProgress(
+          animation: _animationController,
+        ),
       ),
     );
 
@@ -175,16 +209,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         phone: _userDetail!.data.phone,
       );
 
-      Navigator.of(context).pop(); // Cierra el diálogo de carga
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Perfil actualizado correctamente')),
-      );
-      Navigator.of(context).pop();
+
+       await UserCacheService.clearUserData(); // Borra la caché actual
+    final updatedUser = await UserService.getUserDetail(); // Obtiene los datos frescos
+    await UserCacheService.saveUserData(updatedUser.data); // Guarda los nuevos datos
+
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close dialog
+        _animationController.stop(); // Stop animation
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Perfil actualizado correctamente')),
+        );
+       
+      }
     } catch (e) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar: ${e.toString()}')),
-      );
+      if (mounted) {
+        Navigator.of(context).pop(); // Close dialog
+        _animationController.stop(); // Stop animation
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+        _animationController.reset(); // Reset animation
+      }
     }
   }
 
@@ -207,8 +260,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       body: Stack(
         children: [
           if (_isLoading)
-            const Center(
-                child: CircularProgressIndicator(color: AppColors.primary))
+            Center(
+              child: AnimatedTruckProgress(
+                animation: _animationController,
+              ),
+            )
           else if (_errorMessage != null)
             Center(child: Text(_errorMessage!))
           else
@@ -220,7 +276,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 const SizedBox(height: 16),
                 const Center(
                   child: Text(
-                    '38 móviles asociados', // Este texto es estático por ahora
+                    '38 móviles asociados',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
@@ -235,7 +291,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 const SizedBox(height: 120),
               ],
             ),
-          if (!_isLoading && _errorMessage == null) _buildSaveChangesButton(),
+          if (!_isLoading && _errorMessage == null && !_isSaving)
+            _buildSaveChangesButton(),
         ],
       ),
     );
@@ -303,11 +360,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
-          readOnly: true, // Hace que el campo no se pueda editar
+          readOnly: true,
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors
-                .grey.shade100, // Color para indicar que es de solo lectura
+            fillColor: Colors.grey.shade100,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             border: OutlineInputBorder(
@@ -329,7 +385,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         width: double.infinity,
         child: ElevatedButton(
           onPressed:
-              (_selectedImage != null && !_isLoading) ? _saveChanges : null,
+              (_selectedImage != null && !_isLoading && !_isSaving)
+                  ? _saveChanges
+                  : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             disabledBackgroundColor: Colors.grey.shade300,

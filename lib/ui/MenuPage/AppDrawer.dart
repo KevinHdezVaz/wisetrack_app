@@ -85,64 +85,7 @@ class AppDrawer extends StatelessWidget {
                     title: 'Configuraciones',
                     routeName: '/settings',
                   ),
-                  const Divider(),
-                  const Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    child: Text(
-                      'Información de Depuración',
-                      style: TextStyle(
-                          color: Colors.grey, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                  ValueListenableBuilder<String?>(
-                    valueListenable:
-                        NotificationServiceFirebase.fcmTokenNotifier,
-                    builder: (context, fcmToken, child) {
-                      return ListTile(
-                        leading: Icon(
-                          fcmToken == null ||
-                                  fcmToken.contains('Error') ||
-                                  fcmToken.contains('denegado') ||
-                                  fcmToken.contains('No disponible')
-                              ? Icons.warning_amber_rounded
-                              : Icons.check_circle_outline,
-                          color: fcmToken == null ||
-                                  fcmToken.contains('Error') ||
-                                  fcmToken.contains('denegado') ||
-                                  fcmToken.contains('No disponible')
-                              ? Colors.red
-                              : Colors.green,
-                        ),
-                        title: const Text('Estado de Notificaciones'),
-                        subtitle: SelectableText(
-                          fcmToken ?? 'Obteniendo token...',
-                          style: const TextStyle(
-                              fontSize: 12, color: Colors.black54),
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.copy, size: 20.0),
-                          tooltip: 'Copiar Token',
-                          onPressed: (fcmToken == null ||
-                                  fcmToken.contains("No disponible") ||
-                                  fcmToken.contains("Error") ||
-                                  fcmToken.contains("denegado"))
-                              ? null
-                              : () {
-                                  Clipboard.setData(
-                                      ClipboardData(text: fcmToken));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content:
-                                          Text('Token copiado al portapapeles'),
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                        ),
-                      );
-                    },
-                  ),
+                
                 
                 ],
               ),

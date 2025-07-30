@@ -39,6 +39,7 @@ class AlertPermissions {
   final bool noArrivalAtDestination;
   final bool tenHoursDriving;
   final bool continuousDriving;
+  final bool test; // <-- Propiedad añadida
 
   AlertPermissions({
     required this.shortBreak,
@@ -46,6 +47,8 @@ class AlertPermissions {
     required this.noArrivalAtDestination,
     required this.tenHoursDriving,
     required this.continuousDriving,
+        required this.test, // <-- Añadido al constructor
+
   });
 
   factory AlertPermissions.fromJson(Map<String, dynamic> json) {
@@ -55,6 +58,8 @@ class AlertPermissions {
       noArrivalAtDestination: json['No presentación en destino'] ?? false,
       tenHoursDriving: json['conduccion 10 Horas'] ?? false,
       continuousDriving: json['conduccion continua'] ?? false,
+            test: json['Test'] ?? false, // <-- Mapeo del JSON
+
     );
   }
 
@@ -65,6 +70,8 @@ class AlertPermissions {
       'No presentación en destino': noArrivalAtDestination,
       'conduccion 10 Horas': tenHoursDriving,
       'conduccion continua': continuousDriving,
+            'Test': test, // <-- Añadido al JSON
+
     };
   }
 
@@ -74,6 +81,8 @@ class AlertPermissions {
     bool? noArrivalAtDestination,
     bool? tenHoursDriving,
     bool? continuousDriving,
+        bool? test, // <-- Añadido a copyWith
+
   }) {
     return AlertPermissions(
       shortBreak: shortBreak ?? this.shortBreak,
@@ -82,6 +91,8 @@ class AlertPermissions {
           noArrivalAtDestination ?? this.noArrivalAtDestination,
       tenHoursDriving: tenHoursDriving ?? this.tenHoursDriving,
       continuousDriving: continuousDriving ?? this.continuousDriving,
+            test: test ?? this.test,
+
     );
   }
 

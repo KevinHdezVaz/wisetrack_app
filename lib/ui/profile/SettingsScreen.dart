@@ -26,6 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _noArrivalAlerts = false;
   bool _tenHoursDrivingAlerts = false;
   bool _continuousDrivingAlerts = false;
+  bool _testAlerts = false; // <-- AÑADE ESTA LÍNEA
 
   @override
   void initState() {
@@ -96,6 +97,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         _tenHoursDrivingAlerts = permissions.alertPermissions.tenHoursDriving;
         _continuousDrivingAlerts =
             permissions.alertPermissions.continuousDriving;
+                    _testAlerts = permissions.alertPermissions.test; // <-- AÑADE ESTA LÍNEA
+
       });
     }
   }
@@ -118,7 +121,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           name: 'conduccion 10 Horas', value: _tenHoursDrivingAlerts);
       await NotificationService.updateSingleNotificationPermission(
           name: 'conduccion continua', value: _continuousDrivingAlerts);
-
+      await NotificationService.updateSingleNotificationPermission(
+          name: 'Test', value: _testAlerts); // <-- AÑADE ESTA LÍNEA
       await NotificationCountService.updateCount();
 
 
@@ -243,6 +247,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                             _continuousDrivingAlerts,
                             (val) =>
                                 setState(() => _continuousDrivingAlerts = val)),
+
+                                  _buildSwitchTile( // <-- AÑADE ESTE WIDGET
+                      'Test',
+                      _testAlerts,
+                      (val) => setState(() => _testAlerts = val)),
+                          
+
                       ],
                     ),
                     const SizedBox(height: 80), // Space for the floating button

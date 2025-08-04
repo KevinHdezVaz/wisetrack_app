@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:wisetrack_app/data/models/NotificationItem.dart' as model;
- import 'package:wisetrack_app/data/services/NotificationsService.dart';
+import 'package:wisetrack_app/data/services/NotificationsService.dart';
 import 'package:wisetrack_app/data/models/alert/NotificationPermissions.dart';
 import 'package:wisetrack_app/ui/MenuPage/notifications/NotificationDetailScreen.dart';
 import 'package:wisetrack_app/ui/color/app_colors.dart';
@@ -37,6 +37,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   List<model.Notification> _todayNotifications = [];
   List<model.Notification> _previousNotifications = [];
   Set<int> _readNotificationIds = {}; 
+  Set<int> _todayMasterIds = {}; // Almacena los IDs originales de hoy para la separación
 
   NotificationPermissions? _notificationPermissions;
 
@@ -74,11 +75,21 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
       if (mounted) {
         setState(() {
-          _todayNotifications = notificationData.todayNotifications;
-          _previousNotifications = notificationData.previousNotifications;
+          // 1. Guardar los IDs de las notificaciones de hoy para poder separarlas después
+          _todayMasterIds = notificationData.todayNotifications.map((n) => n.id).toSet();
+
+          // 2. Combinar todas las notificaciones en una sola lista
+          _allNotifications = [
+            ...notificationData.todayNotifications,
+            ...notificationData.previousNotifications,
+          ];
+          
+          // 3. Ordenar la lista completa. La más reciente (ID más alto) primero.
+          _allNotifications.sort((a, b) => b.id.compareTo(a.id));
+
           _readNotificationIds = readIds;
           
-          _allNotifications = [..._todayNotifications, ..._previousNotifications];
+          // 4. Generar filtros y aplicar la lógica de visualización
           _generateFiltersFromNotifications(_allNotifications);
           _applyFilters();
         });
@@ -116,8 +127,11 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
       if (mounted && notificationData.previousNotifications.isNotEmpty) {
         setState(() {
-          _previousNotifications.addAll(notificationData.previousNotifications);
+          // Añadir las nuevas notificaciones a la lista principal
           _allNotifications.addAll(notificationData.previousNotifications);
+          // Re-ordenar la lista completa para mantener el orden
+          _allNotifications.sort((a, b) => b.id.compareTo(a.id));
+          // Aplicar filtros a la lista actualizada
           _applyFilters();
         });
       } else {
@@ -146,10 +160,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         _readNotificationIds.add(notification.id);
       });
       ReadStatusManager.markNotificationAsRead(notification.id);
-            NotificationCountService.decrementCount(); // <-- ¡AQUÍ! Decrementa el contador
-
-
-//buenas 
+            NotificationCountService.decrementCount();
     }
 
     Navigator.push(
@@ -177,6 +188,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
  
   void _applyFilters() {
     setState(() {
+      // Filtrar la lista maestra ordenada
       List<model.Notification> filtered = _allNotifications
           .where((n) => _isAlertTypeAllowed(n.type))
           .toList();
@@ -186,9 +198,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         filtered = filtered.where((n) => n.type == selectedType).toList();
       }
 
-      final todayOriginalIds = _todayNotifications.map((e) => e.id).toSet();
-      _todayNotifications = filtered.where((n) => todayOriginalIds.contains(n.id)).toList();
-      _previousNotifications = filtered.where((n) => !todayOriginalIds.contains(n.id)).toList();
+      // Separar la lista filtrada en 'Hoy' y 'Anteriores' para la UI
+      // La ordenación se mantiene porque 'filtered' ya está ordenada.
+      _todayNotifications = filtered.where((n) => _todayMasterIds.contains(n.id)).toList();
+      _previousNotifications = filtered.where((n) => !_todayMasterIds.contains(n.id)).toList();
     });
   }
   
@@ -199,11 +212,13 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       return false;
     }
     final p = _notificationPermissions!.alertPermissions;
+
     return (p.maxSpeed && alertType == 'Velocidad Maxima') ||
         (p.shortBreak && alertType == 'descanso corto') ||
         (p.noArrivalAtDestination && alertType == 'No presentación en destino') ||
         (p.tenHoursDriving && alertType == 'conduccion 10 Horas') ||
-        (p.continuousDriving && alertType == 'conduccion continua');
+        (p.continuousDriving && alertType == 'conduccion continua') ||
+        (p.test && alertType == 'Test'); 
   }
 
   @override
@@ -377,6 +392,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     if (name.contains('conduccion') || name.contains('horas') || name.contains('continua')) return Icons.time_to_leave;
     if (name.contains('descanso')) return Icons.hotel;
     if (name.contains('destino')) return Icons.location_on;
+    if (name.contains('test')) return Icons.science; 
     return Icons.notifications;
   }
   

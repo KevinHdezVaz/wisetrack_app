@@ -18,7 +18,7 @@ class _AuthWrapperState extends State<AuthWrapper> with SingleTickerProviderStat
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3), // Animation duration
+      duration: const Duration(seconds: 3), 
     );
     _checkSessionAndRedirect();
   }

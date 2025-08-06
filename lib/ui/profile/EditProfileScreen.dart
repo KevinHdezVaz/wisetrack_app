@@ -340,7 +340,7 @@ Future<void> _pickImage(ImageSource source) async {
       radius: 50,
       backgroundColor: const Color(0xFFE6E0F8),
       backgroundImage: _userDetail?.data.userImage != null
-          ? NetworkImage(_userDetail!.data.userImage)
+          ? NetworkImage(_userDetail!.data.userImage!)
           : null,
       child: _userDetail?.data.userImage == null
           ? const Icon(Icons.person, size: 50, color: Colors.white)

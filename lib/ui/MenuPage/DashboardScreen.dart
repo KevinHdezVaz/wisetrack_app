@@ -947,7 +947,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             (snapshot.connectionState == ConnectionState.done &&
                     snapshot.hasData &&
                     snapshot.data!.data.userImage != null)
-                ? NetworkImage(snapshot.data!.data.userImage)
+                ? NetworkImage(snapshot.data!.data.userImage!)
                 : null;
 
         return Container(

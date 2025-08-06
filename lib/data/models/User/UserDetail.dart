@@ -17,7 +17,7 @@ class UserData {
   final Company company;
   final String? phone;
   final PermissionDetail permission;
-  final String userImage;
+  final String? userImage; // <--- 1. CORREGIDO: Ahora es nulable
 
   UserData({
     required this.username,
@@ -26,8 +26,9 @@ class UserData {
     required this.company,
     this.phone,
     required this.permission,
-    required this.userImage,
+    this.userImage, // <--- CORREGIDO: Ya no es 'required'
   });
+
   factory UserData.fromJson(Map<String, dynamic> json) {
     return UserData(
       username: json['username'] as String,
@@ -36,19 +37,20 @@ class UserData {
       company: Company.fromJson(json['company']),
       phone: json['phone'] as String?,
       permission: PermissionDetail.fromJson(json['permission']),
-      userImage: json['user_image'] as String,
+      userImage: json['user_image'] as String?, // <--- 2. CORREGIDO: Se procesa como nulable
     );
   }
+
   Map<String, dynamic> toJson() => {
         'username': username,
         'name': name,
         'lastname': lastname,
-        'company': company.toJson(), // Llama al toJson() de la clase Company
+        'company': company.toJson(),
         'phone': phone,
-        'permission':
-            permission.toJson(), // Llama al toJson() de la clase Permission
+        'permission': permission.toJson(),
         'user_image': userImage,
       };
+      
   String get fullName => lastname != null ? '$name $lastname' : name;
 }
 

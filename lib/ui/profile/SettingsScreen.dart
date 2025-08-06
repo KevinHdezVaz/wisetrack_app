@@ -178,8 +178,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                       leading: CircleAvatar(
                         radius: 30,
                         backgroundImage: _currentUser?.userImage != null &&
-                                _currentUser!.userImage.isNotEmpty
-                            ? NetworkImage(_currentUser!.userImage)
+                                _currentUser!.userImage!.isNotEmpty
+                            ? NetworkImage(_currentUser!.userImage!)
                             : const AssetImage(
                                     'assets/images/default_avatar.png')
                                 as ImageProvider, // Fallback to a local asset

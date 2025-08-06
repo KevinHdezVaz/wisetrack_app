@@ -153,7 +153,7 @@ class AppDrawer extends StatelessWidget {
         String userName = 'Invitado';
         if (snapshot.connectionState == ConnectionState.done) {
           if (snapshot.hasData && snapshot.data != null) {
-            userName = snapshot.data!.fullName;
+            userName = snapshot.data!.name;
           } else if (snapshot.hasError) {
             userName = 'Error';
             print(
@@ -167,7 +167,7 @@ class AppDrawer extends StatelessWidget {
             child: Text(
               'Hola $userName!',
               style: const TextStyle(
-                fontSize: 28,
+                fontSize: 25,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textDark,
               ),
